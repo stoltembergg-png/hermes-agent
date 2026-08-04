@@ -1,0 +1,26 @@
+{
+  "feature": "pr-002-mention-parser",
+  "status": "pass",
+  "exit_code": 0,
+  "pytest_exit_code": 0,
+  "git": {
+    "sha": "43717123ca1566a073270c5a61431e2e0e4a0211",
+    "branch": "feature/vector-consolidation",
+    "dirty": true
+  },
+  "platform": "MINGW64_NT-10.0-26100 3.6.7-fb42d713.x86_64 x86_64",
+  "tools": {
+    "python": "Python 3.11.15",
+    "pytest": "pytest 9.1.1"
+  },
+  "spec_file": ".spec/features/pr-002-mention-parser/spec.md",
+  "test_file": "tests/test_pr_002_mention_parser.py",
+  "marker_expression": "ac_vec_002_1 or ac_vec_002_2 or ac_vec_002_3 or ac_vec_002_4 or ac_vec_002_5 or ac_vec_002_6",
+  "summary": {
+    "spec_ac_count": 6,
+    "passed_count": 6,
+    "failed_count": 0,
+    "missing_count": 0
+  },
+  "details": [ {"ac": "AC-VEC-002-1", "status": "pass"} , {"ac": "AC-VEC-002-2", "status": "pass"} , {"ac": "AC-VEC-002-3", "status": "pass"} , {"ac": "AC-VEC-002-4", "status": "pass"} , {"ac": "AC-VEC-002-5", "status": "pass"} , {"ac": "AC-VEC-002-6", "status": "pass"} ]
+}
