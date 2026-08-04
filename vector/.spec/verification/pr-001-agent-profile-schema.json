@@ -1,0 +1,26 @@
+{
+  "feature": "pr-001-agent-profile-schema",
+  "status": "pass",
+  "exit_code": 0,
+  "pytest_exit_code": 0,
+  "git": {
+    "sha": "43717123ca1566a073270c5a61431e2e0e4a0211",
+    "branch": "feature/vector-consolidation",
+    "dirty": true
+  },
+  "platform": "MINGW64_NT-10.0-26100 3.6.7-fb42d713.x86_64 x86_64",
+  "tools": {
+    "python": "Python 3.11.15",
+    "pytest": "pytest 9.1.1"
+  },
+  "spec_file": ".spec/features/pr-001-agent-profile-schema/spec.md",
+  "test_file": "tests/test_pr_001_agent_profile_schema.py",
+  "marker_expression": "ac_vec_001_1 or ac_vec_001_2 or ac_vec_001_3 or ac_vec_001_4 or ac_vec_001_5 or ac_vec_001_6 or ac_vec_001_7",
+  "summary": {
+    "spec_ac_count": 7,
+    "passed_count": 7,
+    "failed_count": 0,
+    "missing_count": 0
+  },
+  "details": [ {"ac": "AC-VEC-001-1", "status": "pass"} , {"ac": "AC-VEC-001-2", "status": "pass"} , {"ac": "AC-VEC-001-3", "status": "pass"} , {"ac": "AC-VEC-001-4", "status": "pass"} , {"ac": "AC-VEC-001-5", "status": "pass"} , {"ac": "AC-VEC-001-6", "status": "pass"} , {"ac": "AC-VEC-001-7", "status": "pass"} ]
+}

@@ -1,0 +1,63 @@
+name: vector-contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "vector/**"
+      - ".github/workflows/vector-contract.yml"
+  pull_request:
+    paths:
+      - "vector/**"
+      - ".github/workflows/vector-contract.yml"
+
+# Cancel in-progress runs on the same ref to save minutes.
+concurrency:
+  group: vector-contract-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ----- vector contract verifier, lightweight ubuntu-latest run ------------
+  contract:
+    name: vector contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-python@82a7e6cbf49b6c5b52f5e8367ff8e5b8c5d7d3ba # v6.0.0
+        with:
+          python-version: "3.11"
+      - name: Install uv (used by verify-feature.sh)
+        run: pip install --quiet uv
+      - name: Run verify-feature.sh for every implemented vector feature
+        run: |
+          mkdir -p vector/.spec/verification
+          for spec_dir in vector/.spec/features/*/; do
+              [ -d "$spec_dir" ] || continue
+              slug=$(basename "$spec_dir")
+              echo ">>> verifying $slug"
+              bash vector/scripts/verify-feature.sh "$slug" --json \
+                  > "vector/.spec/verification/${slug}.json"
+          done
+      - name: Upload verification artefacts
+        if: always()
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb2947d0 # v4.6.2
+        with:
+          name: vector-verification-evidence
+          path: vector/.spec/verification/
+          if-no-files-found: ignore
+
+  # ----- vector lint (separate so failures are fast and unambiguous) ----------
+  lint:
+    name: vector lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-python@82a7e6cbf49b6c5b52f5e8367ff8e5b8c5d7d3ba # v6.0.0
+        with:
+          python-version: "3.11"
+      - name: Install ruff
+        run: pip install --quiet ruff
+      - name: Run ruff on vector/
+        run: ruff check vector/src vector/tests vector/scripts
