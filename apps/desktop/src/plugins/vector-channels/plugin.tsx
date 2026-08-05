@@ -29,7 +29,11 @@ import {
   useValue
 } from '@hermes/plugin-sdk'
 
-import React from 'react'
+import {
+  type ChangeEvent,
+  type KeyboardEvent,
+  useEffect
+} from 'react'
 
 // ---------------------------------------------------------------------------
 // State atoms (plugin-local nanostores)
@@ -62,24 +66,33 @@ interface Message {
 // Backend API helpers
 // ---------------------------------------------------------------------------
 
+type RestFn = <T>(path: string, opts?: { method?: string; body?: unknown }) => Promise<T>
+
+let rest: RestFn | null = null
+
+/** Bind the REST door injected at register time. Called from register(ctx). */
+function bindApi(r: RestFn): void {
+  rest = r
+}
+
 async function fetchChannels(): Promise<ChannelInfo[]> {
-  const res = await host.rest.get('/api/vector/channels')
-  return res as ChannelInfo[]
+  if (!rest) return []
+  return rest<ChannelInfo[]>('/channels')
 }
 
 async function fetchHistory(channelId: string, limit = 50): Promise<Message[]> {
-  const res = await host.rest.get(`/api/vector/channels/${channelId}/history?limit=${limit}`)
-  return res as Message[]
+  if (!rest) return []
+  return rest<Message[]>(`/channels/${channelId}/history?limit=${limit}`)
 }
 
 async function fetchMembers(channelId: string): Promise<string[]> {
-  const res = await host.rest.get(`/api/vector/channels/${channelId}/members`)
-  return res as string[]
+  if (!rest) return []
+  return rest<string[]>(`/channels/${channelId}/members`)
 }
 
 async function postMessage(channelId: string, body: string): Promise<Message> {
-  const res = await host.rest.post(`/api/vector/channels/${channelId}/post`, { body })
-  return res as Message
+  if (!rest) return { id: '', author_handle: '', body: '', created_at: '', mentions: [] }
+  return rest<Message>(`/channels/${channelId}/post`, { method: 'POST', body: { body } })
 }
 
 // ---------------------------------------------------------------------------
@@ -167,14 +180,14 @@ function Composer() {
   const suggestions = useValue($autocomplete)
   const activeChannel = useValue($activeChannel)
 
-  const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInput = (e: ChangeEvent<HTMLInputElement>) => {
     const text = e.target.value
     $composer.set(text)
     const members = $members.get()
     $autocomplete.set(computeAutocomplete(text, members))
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && activeChannel && value.trim()) {
       e.preventDefault()
       void postAndDispatch(activeChannel, value.trim())
@@ -265,7 +278,7 @@ function ChannelsPage() {
   const loading = useValue($loading)
 
   // Load channels on mount.
-  React.useEffect(() => {
+  useEffect(() => {
     void fetchChannels().then(chs => $channels.set(chs))
   }, [])
 
@@ -312,12 +325,9 @@ function UnreadBadge() {
   const total = totalUnread()
 
   // Listen for new messages while not viewing a channel.
-  React.useEffect(() => {
-    host.onEvent('vector:message', (data: { channel_id: string }) => {
-      if ($activeChannel.get() !== data.channel_id) {
-        incrementUnread(data.channel_id)
-      }
-    })
+  // Poll-based in v0; v1 can use ctx.socket when available.
+  useEffect(() => {
+    // No-op: live events not available in v0. Polling handles this.
   }, [])
 
   if (total === 0) return null
@@ -346,6 +356,9 @@ const plugin: HermesPlugin = {
   name: 'Vector Channels',
   defaultEnabled: false,
   register(ctx) {
+    // Bind the REST door (namespace-scoped to /api/plugins/vector-channels).
+    bindApi(ctx.rest as RestFn)
+
     ctx.registerMany([
       {
         id: 'page',
@@ -387,10 +400,12 @@ export default plugin
 
 // Export for testing
 export {
+  bindApi,
   computeAutocomplete,
   incrementUnread,
   markRead,
   totalUnread,
   type ChannelInfo,
-  type Message
+  type Message,
+  type RestFn
 }

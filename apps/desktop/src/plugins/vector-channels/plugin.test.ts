@@ -12,7 +12,8 @@ import {
   markRead,
   totalUnread,
   type ChannelInfo,
-  type Message
+  type Message,
+  type RestFn
 } from './plugin'
 
 describe('computeAutocomplete', () => {
