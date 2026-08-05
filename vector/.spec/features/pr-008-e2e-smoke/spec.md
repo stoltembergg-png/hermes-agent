@@ -14,6 +14,4 @@ End-to-end regression tests for vector v0 that exercise the full stack
 - @spec:AC-008-5 — CLI cross-process persistence (agents add → list in new process)
 - @spec:AC-008-6 — no regression on core objects
 
-## test_file
-
 test_file: tests/test_pr_008_e2e_smoke.py
