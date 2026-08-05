@@ -11,8 +11,8 @@ import {
   type ChannelInfo,
   computeAutocomplete,
   incrementUnread,
-  type Message,
   markRead,
+  type Message,
   totalUnread,
 } from './plugin'
 

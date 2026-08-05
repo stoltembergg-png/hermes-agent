@@ -407,12 +407,12 @@ export default plugin
 
 // Export for testing
 export {
-  type ChannelInfo,
   bindApi,
+  type ChannelInfo,
   computeAutocomplete,
   incrementUnread,
-  type Message,
   markRead,
-  type RestFn,
+  type Message,
   totalUnread,
+  type RestFn,
 }
