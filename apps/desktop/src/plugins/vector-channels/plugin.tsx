@@ -33,8 +33,8 @@ import {
   type ChannelInfo,
   getHistory,
   getMembers,
-  listChannels,
   postMessage as apiPostMessage,
+  listChannels,
   type MessageInfo,
   type RestFn,
 } from './api'
