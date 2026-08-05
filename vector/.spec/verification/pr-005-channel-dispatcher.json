@@ -1,0 +1,26 @@
+{
+  "feature": "pr-005-channel-dispatcher",
+  "status": "pass",
+  "exit_code": 0,
+  "pytest_exit_code": 0,
+  "git": {
+    "sha": "bf62e763e166223c994b6c9f732f4280024af47c",
+    "branch": "feature/pr-005-channel-dispatcher",
+    "dirty": true
+  },
+  "platform": "MINGW64_NT-10.0-26100 3.6.7-fb42d713.x86_64 x86_64",
+  "tools": {
+    "python": "Python 3.11.15",
+    "pytest": "pytest 9.1.1"
+  },
+  "spec_file": ".spec/features/pr-005-channel-dispatcher/spec.md",
+  "test_file": "tests/test_pr_005_dispatcher.py",
+  "marker_expression": "ac_vec_005_1 or ac_vec_005_2 or ac_vec_005_3 or ac_vec_005_4 or ac_vec_005_5 or ac_vec_005_6",
+  "summary": {
+    "spec_ac_count": 6,
+    "passed_count": 6,
+    "failed_count": 0,
+    "missing_count": 0
+  },
+  "details": [ {"ac": "AC-VEC-005-1", "status": "pass"} , {"ac": "AC-VEC-005-2", "status": "pass"} , {"ac": "AC-VEC-005-3", "status": "pass"} , {"ac": "AC-VEC-005-4", "status": "pass"} , {"ac": "AC-VEC-005-5", "status": "pass"} , {"ac": "AC-VEC-005-6", "status": "pass"} ]
+}

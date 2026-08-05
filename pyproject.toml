@@ -449,6 +449,13 @@ markers = [
     "ac_vec_004_7: PR-004 AC 7 — fallback on transient error",
     "ac_vec_004_8: PR-004 AC 8 — all fallbacks fail → chain summary",
     "ac_vec_004_9: PR-004 AC 9 — non-transient error no fallback",
+    # PR-005 — channel dispatcher
+    "ac_vec_005_1: PR-005 AC 1 — mention produces response",
+    "ac_vec_005_2: PR-005 AC 2 — non-member ignored",
+    "ac_vec_005_3: PR-005 AC 3 — self-mention ignored",
+    "ac_vec_005_4: PR-005 AC 4 — recursion cap depth 3",
+    "ac_vec_005_5: PR-005 AC 5 — history contains original + response",
+    "ac_vec_005_6: PR-005 AC 6 — sequential order a then b",
 ]
 # integration tests take way too long to run in the normal CI environments
 addopts = "-m 'not integration'"
