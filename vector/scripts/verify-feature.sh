@@ -92,11 +92,11 @@ if [ -z "$PYTEST" ]; then
     # Re-detect path after bootstrap.
     if [ -x "$VECTOR_DIR/.venv/Scripts/python.exe" ]; then
         PYTEST="$VECTOR_DIR/.venv/Scripts/python.exe"
-        ( cd "$VECTOR_DIR" && "$UV" pip install --python "$PYTEST" pytest pyyaml >/dev/null ) \
+        ( cd "$VECTOR_DIR" && "$UV" pip install --python "$PYTEST" pytest pyyaml fastapi pydantic httpx httpx2 >/dev/null ) \
             || { echo "error: uv pip install failed" >&2; exit 3; }
     else
         PYTEST="$VECTOR_DIR/.venv/bin/python"
-        ( cd "$VECTOR_DIR" && "$UV" pip install --python "$PYTEST" pytest pyyaml >/dev/null ) \
+        ( cd "$VECTOR_DIR" && "$UV" pip install --python "$PYTEST" pytest pyyaml fastapi pydantic httpx httpx2 >/dev/null ) \
             || { echo "error: uv pip install failed" >&2; exit 3; }
     fi
 fi
@@ -170,13 +170,13 @@ trap 'rm -f "$PYTEST_LOG"' EXIT
 # only on stdout — pytest output goes to stderr.
 if $JSON_MODE; then
     set +e
-    ( cd "$REPO_ROOT" && "$PYTEST" -m pytest -m "$MARK_EXPR" "$TEST_FILE" -v --tb=short "${PYTEST_ARGS[@]}" ) \
+    ( cd "$REPO_ROOT" && PYTHONPATH="$VECTOR_DIR/src:$PYTHONPATH" "$PYTEST" -m pytest -m "$MARK_EXPR" "$TEST_FILE" -v --tb=short "${PYTEST_ARGS[@]}" ) \
         > "$PYTEST_LOG" 2>&1
     PYTEST_EXIT=$?
     set -e
 else
     set +e
-    ( cd "$REPO_ROOT" && "$PYTEST" -m pytest -m "$MARK_EXPR" "$TEST_FILE" -v --tb=short "${PYTEST_ARGS[@]}" ) 2>&1 | tee "$PYTEST_LOG"
+    ( cd "$REPO_ROOT" && PYTHONPATH="$VECTOR_DIR/src:$PYTHONPATH" "$PYTEST" -m pytest -m "$MARK_EXPR" "$TEST_FILE" -v --tb=short "${PYTEST_ARGS[@]}" ) 2>&1 | tee "$PYTEST_LOG"
     PYTEST_EXIT=${PIPESTATUS[0]}
     set -e
 fi

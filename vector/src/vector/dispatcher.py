@@ -143,6 +143,7 @@ class Dispatcher:
             run_result = self._runtime.run(
                 profile,
                 message,
+                context=context_str or None,
                 timeout=300,
             )
 

@@ -12,7 +12,7 @@ import {
   computeAutocomplete,
   incrementUnread,
   markRead,
-  type Message,
+  type MessageInfo,
   totalUnread,
 } from './plugin'
 
@@ -31,7 +31,6 @@ describe('computeAutocomplete', () => {
   })
 
   it('returns all @gandalf variants when @gandalf is typed', () => {
-    // Exact match AND partial matches are all returned.
     const result = computeAutocomplete('hi @gandalf', members)
     expect(result).toContain('gandalf')
     expect(result).toContain('gandalf2')
@@ -65,14 +64,12 @@ describe('computeAutocomplete', () => {
   })
 
   it('only matches at end of text (not in the middle)', () => {
-    // @sre followed by more text should not autocomplete
     expect(computeAutocomplete('@sre hello there', members)).toEqual([])
   })
 })
 
 describe('unread badge logic', () => {
   beforeEach(() => {
-    // Reset by marking all channels read
     markRead('ch1')
     markRead('ch2')
     markRead('ch3')
@@ -115,16 +112,17 @@ describe('unread badge logic', () => {
 })
 
 describe('TypeShape', () => {
-  it('ChannelInfo has id, name, member_count', () => {
+  it('ChannelInfo has id, name', () => {
     const ch: ChannelInfo = { id: '1', name: 'dev-room', member_count: 5 }
     expect(ch.id).toBe('1')
     expect(ch.name).toBe('dev-room')
     expect(ch.member_count).toBe(5)
   })
 
-  it('Message has id, author_handle, body, created_at, mentions', () => {
-    const msg: Message = {
+  it('MessageInfo has id, author_handle, body, created_at, mentions', () => {
+    const msg: MessageInfo = {
       id: '1',
+      channel_id: 'ch1',
       author_handle: 'gandalf',
       body: 'hello',
       created_at: '2026-01-01T00:00:00Z',
