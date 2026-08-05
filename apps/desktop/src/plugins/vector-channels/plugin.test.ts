@@ -6,10 +6,11 @@
  */
 
 import { beforeEach, describe, expect, it } from 'vitest'
+
 import {
+  computeAutocomplete,
   type ChannelInfo,
   type Message,
-  computeAutocomplete,
   incrementUnread,
   markRead,
   totalUnread,

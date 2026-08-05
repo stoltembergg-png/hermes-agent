@@ -18,8 +18,8 @@ import {
   type HermesPlugin,
   PALETTE_AREA,
   type PaletteContribution,
-  ROUTES_AREA,
   type RouteContribution,
+  ROUTES_AREA,
   SIDEBAR_NAV_AREA,
   type SidebarNavContribution,
   STATUSBAR_AREAS,
@@ -409,10 +409,10 @@ export default plugin
 export {
   type ChannelInfo,
   type Message,
-  type RestFn,
   bindApi,
   computeAutocomplete,
   incrementUnread,
   markRead,
   totalUnread,
+  type RestFn,
 }
