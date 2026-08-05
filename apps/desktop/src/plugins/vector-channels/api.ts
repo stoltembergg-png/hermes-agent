@@ -98,6 +98,7 @@ export interface VectorApiError {
 
 type RestFn = <T>(path: string, opts?: { method?: string; body?: unknown }) => Promise<T>
 
+export { type RestFn }
 let _rest: RestFn | null = null
 
 export function bindApi(rest: RestFn): void {

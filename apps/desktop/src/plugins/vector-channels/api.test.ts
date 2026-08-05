@@ -13,19 +13,17 @@ import {
   listAgents,
   listChannels,
   postMessage,
+  type RestFn,
 } from './api'
 
 // ---------------------------------------------------------------------------
 // Mock REST function
 // ---------------------------------------------------------------------------
 
-function makeMockRest() {
-  const calls: Array<{ path: string; method?: string; body?: unknown }> = []
-  const rest = vi.fn(<T>(path: string, opts?: { method?: string; body?: unknown }): Promise<T> => {
-    calls.push({ path, method: opts?.method, body: opts?.body })
-    // Return a reasonable default based on path
+function makeMockRest(): RestFn {
+  return vi.fn(<T>(path: string, opts?: { method?: string; body?: unknown }): Promise<T> => {
     if (path.endsWith('/health')) {
-      return Promise.resolve({ status: 'ok', version: '0.1.0', storage: 'sqlite' }) as T
+      return Promise.resolve({ status: 'ok', version: '0.1.0', storage: 'sqlite' } as T)
     }
     if (path === '/api/vector/agents') {
       if (opts?.method === 'POST') {
@@ -35,24 +33,24 @@ function makeMockRest() {
           model: null,
           provider: null,
           tools: [],
-        }) as T
+        } as T)
       }
       return Promise.resolve({
         agents: [
           { handle: 'gandalf', description: null, model: null, provider: null, tools: [] },
         ],
-      }) as T
+      } as T)
     }
     if (path === '/api/vector/channels') {
       if (opts?.method === 'POST') {
-        return Promise.resolve({ id: 'ch1', name: 'dev' }) as T
+        return Promise.resolve({ id: 'ch1', name: 'dev' } as T)
       }
       return Promise.resolve({
         channels: [{ id: 'ch1', name: 'dev', member_count: 2 }],
-      }) as T
+      } as T)
     }
     if (path.includes('/members')) {
-      return Promise.resolve({ members: ['human', 'gandalf'] }) as T
+      return Promise.resolve({ members: ['human', 'gandalf'] } as T)
     }
     if (path.includes('/messages') && opts?.method !== 'POST') {
       return Promise.resolve({
@@ -66,7 +64,7 @@ function makeMockRest() {
             created_at: '2026-01-01T00:00:00Z',
           },
         ],
-      }) as T
+      } as T)
     }
     if (path.includes('/messages') && opts?.method === 'POST') {
       return Promise.resolve({
@@ -103,19 +101,17 @@ function makeMockRest() {
             created_at: '2026-01-01T00:01:00Z',
           },
         ],
-      }) as T
+      } as T)
     }
     return Promise.resolve({} as T)
-  })
-  return { rest, calls }
+  }) as RestFn
 }
 
 // ---------------------------------------------------------------------------
 
 describe('Vector API client', () => {
   beforeEach(() => {
-    const { rest } = makeMockRest()
-    bindApi(rest)
+    bindApi(makeMockRest())
   })
 
   it('getHealth calls /api/vector/health', async () => {

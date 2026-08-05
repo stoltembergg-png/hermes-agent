@@ -47,23 +47,27 @@ jobs:
       - name: Install uv
         run: python -m pip install --disable-pip-version-check uv
 
-      - name: Sync locked dependencies
-        run: uv sync --locked --extra dev
+      - name: Install FastAPI + Pydantic + PyYAML
+        run: |
+          pip install --disable-pip-version-check --quiet \
+            fastapi pydantic pyyaml pytest pyyaml
 
       - name: Ruff
-        run: uv run ruff check vector/src vector/tests
+        run: |
+          pip install --quiet ruff
+          ruff check vector/src vector/tests
 
       - name: Vector API + E2E tests
         run: |
-          uv run pytest \
-            vector/tests/test_pr_004_agent_runtime.py \
-            vector/tests/test_pr_005_dispatcher.py \
-            vector/tests/test_pr_009_gateway_api.py \
-            vector/tests/test_pr_009_gateway_e2e.py \
-            -v --strict-markers
+          cd vector && PYTHONPATH=src python -m pytest \
+            tests/test_pr_004_agent_runtime.py \
+            tests/test_pr_005_dispatcher.py \
+            tests/test_pr_009_gateway_api.py \
+            tests/test_pr_009_gateway_e2e.py \
+            -v --strict-markers -W ignore::DeprecationWarning
 
       - name: Verify PR-009 acceptance contract
-        run: bash vector/scripts/verify-feature.sh pr-009-gateway-api --json
+        run: cd vector && PYTHONPATH=src bash scripts/verify-feature.sh pr-009-gateway-api --json
 
       - name: Upload contract evidence
         if: always()
@@ -84,7 +88,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
 
       - name: Install workspace dependencies
