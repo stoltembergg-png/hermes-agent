@@ -1,0 +1,26 @@
+{
+  "feature": "pr-006-cli",
+  "status": "pass",
+  "exit_code": 0,
+  "pytest_exit_code": 0,
+  "git": {
+    "sha": "f583c6c34713887374482e8255cabb1355b4bd4b",
+    "branch": "feature/pr-006-cli",
+    "dirty": true
+  },
+  "platform": "MINGW64_NT-10.0-26100 3.6.7-fb42d713.x86_64 x86_64",
+  "tools": {
+    "python": "Python 3.11.15",
+    "pytest": "pytest 9.1.1"
+  },
+  "spec_file": ".spec/features/pr-006-cli/spec.md",
+  "test_file": "tests/test_pr_006_cli.py",
+  "marker_expression": "ac_vec_006_1 or ac_vec_006_2 or ac_vec_006_3 or ac_vec_006_4 or ac_vec_006_5 or ac_vec_006_6 or ac_vec_006_7 or ac_vec_006_8",
+  "summary": {
+    "spec_ac_count": 8,
+    "passed_count": 8,
+    "failed_count": 0,
+    "missing_count": 0
+  },
+  "details": [ {"ac": "AC-VEC-006-1", "status": "pass"} , {"ac": "AC-VEC-006-2", "status": "pass"} , {"ac": "AC-VEC-006-3", "status": "pass"} , {"ac": "AC-VEC-006-4", "status": "pass"} , {"ac": "AC-VEC-006-5", "status": "pass"} , {"ac": "AC-VEC-006-6", "status": "pass"} , {"ac": "AC-VEC-006-7", "status": "pass"} , {"ac": "AC-VEC-006-8", "status": "pass"} ]
+}

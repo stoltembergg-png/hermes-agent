@@ -169,9 +169,9 @@ class AgentProfile:
         # datetime -> ISO 8601 string
         d["created_at"] = self.created_at.isoformat()
         d["updated_at"] = self.updated_at.isoformat()
-        # tuple -> list for friendlier YAML/JSON
-        d["tools"] = list(self.tools)
-        d["fallback_models"] = list(self.fallback_models)
+        # tuple -> list for friendlier YAML/JSON (handle None defensively)
+        d["tools"] = list(self.tools or ())
+        d["fallback_models"] = list(self.fallback_models or ())
         return d
 
     @classmethod
@@ -291,10 +291,9 @@ def _yaml_parse_fallback(s: str) -> dict[str, Any]:
 class AgentRegistry:
     """In-memory registry of agent profiles keyed by handle.
 
-    Persistence lives in a later PR; for now this is the contract that
-    downstream code (PR-002 mention parser, PR-003 channel store) tests
-    against. Swapping the storage backend is a one-line change at the
-    call sites.
+    Supports optional YAML persistence via ``save_to_yaml`` / ``load_from_yaml``
+    for CLI use (PR-006). When persistence is not needed, the registry
+    works purely in memory.
     """
 
     def __init__(self, profiles: Iterable[AgentProfile] | None = None) -> None:
@@ -341,3 +340,34 @@ class AgentRegistry:
 
     def __iter__(self):
         return iter(sorted(self._profiles))
+
+    # ----- persistence (PR-006) -----
+
+    def save_to_yaml(self, path: str | Any) -> None:
+        """Save all profiles to a YAML file. The file is a YAML document
+        with a top-level ``profiles`` list. Each profile is serialized
+        via ``AgentProfile.to_dict()``."""
+        import yaml
+
+        data = {"profiles": [p.to_dict() for p in self.all()]}
+        with open(path, "w", encoding="utf-8") as f:
+            yaml.dump(data, f, default_flow_style=False, sort_keys=False)
+
+    @classmethod
+    def load_from_yaml(cls, path: str | Any) -> AgentRegistry:
+        """Load profiles from a YAML file written by ``save_to_yaml``.
+
+        Returns an empty registry if the file does not exist.
+        """
+        import os
+
+        if not os.path.exists(path):
+            return cls()
+        import yaml
+
+        with open(path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+        profiles = []
+        for entry in data.get("profiles", []):
+            profiles.append(AgentProfile.from_dict(entry))
+        return cls(profiles)
