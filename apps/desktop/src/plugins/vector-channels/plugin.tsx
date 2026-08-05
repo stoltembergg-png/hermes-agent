@@ -14,26 +14,25 @@
 import './vector-channels.css'
 
 import {
-  atom,
-  cn,
+  type ChannelInfo,
   Codicon,
   type HermesPlugin,
-  host,
-  type PaletteContribution,
+  type KeyboardEvent,
+  type Message,
   PALETTE_AREA,
-  type RouteContribution,
+  type PaletteContribution,
   ROUTES_AREA,
+  type RestFn,
+  type RouteContribution,
   SIDEBAR_NAV_AREA,
   type SidebarNavContribution,
   STATUSBAR_AREAS,
-  useValue
+  atom,
+  cn,
+  host,
+  useValue,
 } from '@hermes/plugin-sdk'
-
-import {
-  type ChangeEvent,
-  type KeyboardEvent,
-  useEffect
-} from 'react'
+import { type ChangeEvent, useEffect } from 'react'
 
 // ---------------------------------------------------------------------------
 // State atoms (plugin-local nanostores)
@@ -76,22 +75,30 @@ function bindApi(r: RestFn): void {
 }
 
 async function fetchChannels(): Promise<ChannelInfo[]> {
-  if (!rest) return []
+  if (!rest) {
+    return []
+  }
   return rest<ChannelInfo[]>('/channels')
 }
 
 async function fetchHistory(channelId: string, limit = 50): Promise<Message[]> {
-  if (!rest) return []
+  if (!rest) {
+    return []
+  }
   return rest<Message[]>(`/channels/${channelId}/history?limit=${limit}`)
 }
 
 async function fetchMembers(channelId: string): Promise<string[]> {
-  if (!rest) return []
+  if (!rest) {
+    return []
+  }
   return rest<string[]>(`/channels/${channelId}/members`)
 }
 
 async function postMessage(channelId: string, body: string): Promise<Message> {
-  if (!rest) return { id: '', author_handle: '', body: '', created_at: '', mentions: [] }
+  if (!rest) {
+    return { id: '', author_handle: '', body: '', created_at: '', mentions: [] }
+  }
   return rest<Message>(`/channels/${channelId}/post`, { method: 'POST', body: { body } })
 }
 
@@ -102,7 +109,9 @@ async function postMessage(channelId: string, body: string): Promise<Message> {
 function computeAutocomplete(text: string, members: string[]): string[] {
   // Match @<partial> at the end of the text.
   const match = text.match(/@(\w+)$/)
-  if (!match) return []
+  if (!match) {
+    return []
+  }
   const partial = match[1].toLowerCase()
   return members.filter(m => m.toLowerCase().startsWith(partial))
 }
@@ -143,7 +152,7 @@ function ChannelRow({ channel }: { channel: ChannelInfo }) {
         'flex w-full items-center justify-between rounded-md px-3 py-1.5 text-sm transition-colors',
         isActive
           ? 'bg-(--ui-bg-active) text-foreground'
-          : 'text-(--ui-text-secondary) hover:bg-(--chrome-action-hover)'
+          : 'text-(--ui-text-secondary) hover:bg-(--chrome-action-hover)',
       )}
       onClick={() => {
         $activeChannel.set(channel.id)
@@ -202,8 +211,8 @@ function Composer() {
         <div className="autocomplete-list">
           {suggestions.map(s => (
             <button
-              key={s}
               className="autocomplete-item"
+              key={s}
               onClick={() => {
                 // Replace @partial with @suggestion
                 const text = $composer.get().replace(/@(\w+)$/, `@${s} `)
@@ -287,7 +296,7 @@ function ChannelsPage() {
       <aside className="vector-sidebar">
         <h2 className="sidebar-title">Channels</h2>
         {channels.map(ch => (
-          <ChannelRow key={ch.id} channel={ch} />
+          <ChannelRow channel={ch} key={ch.id} />
         ))}
         {channels.length === 0 && (
           <p className="text-(--ui-text-tertiary) text-xs px-3 py-2">No channels.</p>
@@ -330,13 +339,15 @@ function UnreadBadge() {
     // No-op: live events not available in v0. Polling handles this.
   }, [])
 
-  if (total === 0) return null
+  if (total === 0) {
+    return null
+  }
 
   return (
     <button
       className={cn(
         'inline-flex h-full items-center gap-1 rounded-none px-1.5 text-[0.6875rem] tabular-nums transition-colors',
-        'text-(--ui-text-tertiary) hover:bg-(--chrome-action-hover) hover:text-foreground'
+        'text-(--ui-text-tertiary) hover:bg-(--chrome-action-hover) hover:text-foreground',
       )}
       onClick={() => host.navigate('/vector')}
       type="button"
@@ -364,7 +375,7 @@ const plugin: HermesPlugin = {
         id: 'page',
         area: ROUTES_AREA,
         data: { path: '/vector' } satisfies RouteContribution,
-        render: () => <ChannelsPage />
+        render: () => <ChannelsPage />,
       },
       {
         id: 'nav',
@@ -373,14 +384,14 @@ const plugin: HermesPlugin = {
         data: {
           codicon: 'comment-discussion',
           label: 'Channels',
-          path: '/vector'
-        } satisfies SidebarNavContribution
+          path: '/vector',
+        } satisfies SidebarNavContribution,
       },
       {
         id: 'unread',
         area: STATUSBAR_AREAS.right,
         order: 90,
-        render: () => <UnreadBadge />
+        render: () => <UnreadBadge />,
       },
       {
         id: 'open',
@@ -389,23 +400,23 @@ const plugin: HermesPlugin = {
           id: 'vector.openChannels',
           label: 'Vector: Open Channels',
           keywords: ['vector', 'channels', 'agents', 'chat'],
-          run: () => host.navigate('/vector')
-        } satisfies PaletteContribution
-      }
+          run: () => host.navigate('/vector'),
+        } satisfies PaletteContribution,
+      },
     ])
-  }
+  },
 }
 
 export default plugin
 
 // Export for testing
 export {
+  type ChannelInfo,
+  type Message,
+  type RestFn,
   bindApi,
   computeAutocomplete,
   incrementUnread,
   markRead,
   totalUnread,
-  type ChannelInfo,
-  type Message,
-  type RestFn
 }

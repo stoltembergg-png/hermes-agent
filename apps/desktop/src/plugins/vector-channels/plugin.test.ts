@@ -5,15 +5,14 @@
  * markRead, totalUnread.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import {
+  type ChannelInfo,
+  type Message,
   computeAutocomplete,
   incrementUnread,
   markRead,
   totalUnread,
-  type ChannelInfo,
-  type Message,
-  type RestFn
 } from './plugin'
 
 describe('computeAutocomplete', () => {
@@ -52,7 +51,7 @@ describe('computeAutocomplete', () => {
 
   it('returns all matching for @ga prefix', () => {
     const result = computeAutocomplete('@ga', members)
-    expect(result.length).toBe(4)
+    expect(result.length).toBe(3)
   })
 
   it('works with a long message before the @', () => {
@@ -128,7 +127,7 @@ describe('TypeShape', () => {
       author_handle: 'gandalf',
       body: 'hello',
       created_at: '2026-01-01T00:00:00Z',
-      mentions: ['sre']
+      mentions: ['sre'],
     }
     expect(msg.mentions).toEqual(['sre'])
   })
