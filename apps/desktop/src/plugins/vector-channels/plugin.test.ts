@@ -8,10 +8,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import {
-  computeAutocomplete,
   type ChannelInfo,
-  type Message,
+  computeAutocomplete,
   incrementUnread,
+  type Message,
   markRead,
   totalUnread,
 } from './plugin'

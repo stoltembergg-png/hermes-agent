@@ -14,8 +14,11 @@
 import './vector-channels.css'
 
 import {
+  atom,
+  cn,
   Codicon,
   type HermesPlugin,
+  host,
   PALETTE_AREA,
   type PaletteContribution,
   type RouteContribution,
@@ -23,9 +26,6 @@ import {
   SIDEBAR_NAV_AREA,
   type SidebarNavContribution,
   STATUSBAR_AREAS,
-  atom,
-  cn,
-  host,
   useValue,
 } from '@hermes/plugin-sdk'
 import { type ChangeEvent, type KeyboardEvent, useEffect } from 'react'
@@ -408,11 +408,11 @@ export default plugin
 // Export for testing
 export {
   type ChannelInfo,
-  type Message,
   bindApi,
   computeAutocomplete,
   incrementUnread,
+  type Message,
   markRead,
-  totalUnread,
   type RestFn,
+  totalUnread,
 }
