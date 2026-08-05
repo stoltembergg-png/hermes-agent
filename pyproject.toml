@@ -465,6 +465,13 @@ markers = [
     "ac_vec_006_6: PR-006 AC 6 — version",
     "ac_vec_006_7: PR-006 AC 7 — hard cap raises",
     "ac_vec_006_8: PR-006 AC 8 — add-team atomic rollback",
+    # PR-007 — desktop mention panel
+    "ac_vec_007_1: PR-007 AC 1 — plugin loads, adds Channels nav",
+    "ac_vec_007_2: PR-007 AC 2 — new message increments unread",
+    "ac_vec_007_3: PR-007 AC 3 — history last 50 chronological",
+    "ac_vec_007_4: PR-007 AC 4 — @gandalf hello triggers reply",
+    "ac_vec_007_5: PR-007 AC 5 — @gan suggests @gandalf",
+    "ac_vec_007_6: PR-007 AC 6 — no nodeIntegration, context-isolated",
 ]
 # integration tests take way too long to run in the normal CI environments
 addopts = "-m 'not integration'"

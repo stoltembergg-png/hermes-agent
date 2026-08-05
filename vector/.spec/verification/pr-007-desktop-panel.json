@@ -1,0 +1,26 @@
+{
+  "feature": "pr-007-desktop-panel",
+  "status": "pass",
+  "exit_code": 0,
+  "pytest_exit_code": 0,
+  "git": {
+    "sha": "d40547732838f52f2db8b0fe6d42931104b895ea",
+    "branch": "feature/pr-007-desktop-panel",
+    "dirty": true
+  },
+  "platform": "MINGW64_NT-10.0-26100 3.6.7-fb42d713.x86_64 x86_64",
+  "tools": {
+    "python": "Python 3.11.15",
+    "pytest": "pytest 9.1.1"
+  },
+  "spec_file": ".spec/features/pr-007-desktop-panel/spec.md",
+  "test_file": "tests/test_pr_007_desktop_panel.py",
+  "marker_expression": "ac_vec_007_1 or ac_vec_007_2 or ac_vec_007_3 or ac_vec_007_4 or ac_vec_007_5 or ac_vec_007_6",
+  "summary": {
+    "spec_ac_count": 6,
+    "passed_count": 6,
+    "failed_count": 0,
+    "missing_count": 0
+  },
+  "details": [ {"ac": "AC-VEC-007-1", "status": "pass"} , {"ac": "AC-VEC-007-2", "status": "pass"} , {"ac": "AC-VEC-007-3", "status": "pass"} , {"ac": "AC-VEC-007-4", "status": "pass"} , {"ac": "AC-VEC-007-5", "status": "pass"} , {"ac": "AC-VEC-007-6", "status": "pass"} ]
+}
