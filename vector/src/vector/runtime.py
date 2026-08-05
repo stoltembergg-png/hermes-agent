@@ -107,6 +107,7 @@ class AgentRuntime:
         profile: AgentProfile,
         message: str,
         *,
+        context: str | None = None,
         timeout: float = 300,
     ) -> RunResult:
         """Run ``profile`` on ``message`` and return the result.
@@ -118,6 +119,9 @@ class AgentRuntime:
         When the primary model fails with a transient error and
         ``fallback_models`` is non-empty, each fallback is tried in
         order.  Non-transient errors short-circuit immediately.
+
+        ``context`` is additional context (e.g. channel history)
+        passed to the delegate alongside the system prompt.
         """
         # --- resolve effective model + provider ---
         primary_model = profile.model or self._default_model
@@ -132,8 +136,11 @@ class AgentRuntime:
             for fb in profile.fallback_models:
                 attempts.append((fb, primary_provider))
 
-        # --- build the context (system prompt) ---
-        context = profile.system_prompt
+        # --- build the context (system prompt + optional channel history) ---
+        if context:
+            delegate_context = f"{profile.system_prompt}\n\n--- Channel history ---\n{context}"
+        else:
+            delegate_context = profile.system_prompt
 
         # --- prefix the user message with the handle ---
         prefixed_message = f"[{profile.handle}] {message}"
@@ -152,7 +159,7 @@ class AgentRuntime:
             try:
                 raw = self._delegate(
                     goal=prefixed_message,
-                    context=context,
+                    context=delegate_context,
                     role="leaf",
                     max_iterations=None,
                     model=model,

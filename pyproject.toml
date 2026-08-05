@@ -478,6 +478,14 @@ markers = [
     "ac_vec_008_4: PR-008 AC 4 — FTS5 full-text search",
     "ac_vec_008_5: PR-008 AC 5 — CLI cross-process persistence",
     "ac_vec_008_6: PR-008 AC 6 — no regression on core objects",
+    "ac_vec_009_1: PR-009 AC 1 — health endpoint returns status+version+storage",
+    "ac_vec_009_2: PR-009 AC 2 — persistence after service recreation",
+    "ac_vec_009_3: PR-009 AC 3 — post + dispatch stores user and agent messages",
+    "ac_vec_009_4: PR-009 AC 4 — non-member mention not invoked",
+    "ac_vec_009_5: PR-009 AC 5 — prior channel history reaches runtime context",
+    "ac_vec_009_6: PR-009 AC 6 — stable error envelope without tracebacks",
+    "ac_vec_009_7: PR-009 AC 7 — desktop renders user and agent messages",
+    "ac_vec_009_9: PR-009 AC 9 — CI hermetic with no provider keys",
 ]
 # integration tests take way too long to run in the normal CI environments
 addopts = "-m 'not integration'"

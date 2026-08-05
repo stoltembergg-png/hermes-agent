@@ -1,0 +1,103 @@
+name: vector-gateway-api
+
+on:
+  pull_request:
+    paths:
+      - "vector/**"
+      - "gateway/**"
+      - "hermes_cli/web_server.py"
+      - "apps/desktop/src/plugins/vector-channels/**"
+      - "pyproject.toml"
+      - ".github/workflows/vector-gateway-api.yml"
+  push:
+    branches: [main]
+    paths:
+      - "vector/**"
+      - "gateway/**"
+      - "hermes_cli/web_server.py"
+      - "apps/desktop/src/plugins/vector-channels/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vector-gateway-api-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  HERMES_DISABLE_NETWORK_PROVIDERS: "1"
+  OPENAI_API_KEY: ""
+  ANTHROPIC_API_KEY: ""
+  OPENROUTER_API_KEY: ""
+
+jobs:
+  python-contract:
+    name: Vector API contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        run: python -m pip install --disable-pip-version-check uv
+
+      - name: Sync locked dependencies
+        run: uv sync --locked --extra dev
+
+      - name: Ruff
+        run: uv run ruff check vector/src vector/tests
+
+      - name: Vector API + E2E tests
+        run: |
+          uv run pytest \
+            vector/tests/test_pr_004_agent_runtime.py \
+            vector/tests/test_pr_005_dispatcher.py \
+            vector/tests/test_pr_009_gateway_api.py \
+            vector/tests/test_pr_009_gateway_e2e.py \
+            -v --strict-markers
+
+      - name: Verify PR-009 acceptance contract
+        run: bash vector/scripts/verify-feature.sh pr-009-gateway-api --json
+
+      - name: Upload contract evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vector-pr-009-contract-evidence
+          path: vector/.spec/verification/
+          if-no-files-found: warn
+          retention-days: 14
+
+  desktop-unit:
+    name: Vector desktop unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install workspace dependencies
+        run: npm ci
+
+      - name: Typecheck desktop
+        run: npm run --workspace apps/desktop typecheck
+
+      - name: Lint desktop Vector plugin
+        run: npm run --workspace apps/desktop lint -- --quiet
+
+      - name: Run Vector plugin tests
+        run: |
+          npm run --workspace apps/desktop test:ui -- \
+            src/plugins/vector-channels/plugin.test.ts \
+            src/plugins/vector-channels/api.test.ts

@@ -17283,6 +17283,48 @@ def _mount_plugin_api_routes():
 # Mount plugin API routes before the SPA catch-all.
 _mount_plugin_api_routes()
 
+# --- Vector gateway API ----------------------------------------------------
+# Mount the Vector REST namespace under /api/vector.  The service is
+# lazily constructed on first request so import-time side effects stay
+# minimal.  HERMES_HOME / vector subdirectory must exist for persistence;
+# if not, endpoints return a health error.
+try:
+    import os as _os
+    import sys as _sys
+    from pathlib import Path as _Path
+
+    _vector_src = _Path(__file__).resolve().parent.parent / "vector" / "src"
+    if str(_vector_src) not in _sys.path:
+        _sys.path.insert(0, str(_vector_src))
+
+    from vector.api import create_vector_router as _create_vector_router  # noqa: E402
+    from vector.service import VectorService as _VectorService  # noqa: E402
+    from vector.runtime import AgentRuntime as _AgentRuntime  # noqa: E402
+
+    _vector_service_instance: _VectorService | None = None
+
+    def _get_vector_service():
+        global _vector_service_instance
+        if _vector_service_instance is None:
+            _home = _os.environ.get("HERMES_HOME", str(_Path.home() / ".hermes"))
+            _vec_dir = _Path(_home) / "vector"
+            _vec_dir.mkdir(parents=True, exist_ok=True)
+            _vector_service_instance = _VectorService(
+                db_path=str(_vec_dir / "vector.db"),
+                agents_yaml=str(_vec_dir / "agents.yaml"),
+                runtime=_AgentRuntime(),
+            )
+        return _vector_service_instance
+
+    app.include_router(
+        _create_vector_router(_get_vector_service),
+        prefix="/api/vector",
+        tags=["vector"],
+    )
+    _log.info("Mounted Vector API routes: /api/vector/")
+except Exception as exc:
+    _log.warning("Failed to mount Vector API routes: %s", exc)
+
 # Mount the dashboard auth routes (/login, /auth/*, /api/auth/*) before the
 # SPA catch-all so /{full_path:path} doesn't swallow them.  These are
 # always mounted — the gate middleware decides whether to enforce auth,

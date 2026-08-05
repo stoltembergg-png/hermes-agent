@@ -1,14 +1,12 @@
 /**
  * Vector Channels — multi-agent conversation panel for Hermes Desktop.
  *
- * Implements PR-007 of the vector roadmap. Registers a sidebar nav row + a
- * `/vector` route that renders the channel browser, message history, and a
- * composer that posts via the backend dispatcher.
+ * Implements PR-007 + PR-009 of the vector roadmap. Registers a sidebar
+ * nav row + a `/vector` route that renders the channel browser, message
+ * history, and a composer that posts via the backend dispatcher.
  *
- * Ships OFF by default (`defaultEnabled: false`): it inventories in
- * Settings ▸ Plugins and registers nothing until the user flips the switch.
- *
- * The ONLY import surface is `@hermes/plugin-sdk` (lint-enforced).
+ * Ships OFF by default (`defaultEnabled: false`).
+ * REST calls live in ./api.ts and target /api/vector/*.
  */
 
 import './vector-channels.css'
@@ -30,80 +28,35 @@ import {
 } from '@hermes/plugin-sdk'
 import { type ChangeEvent, type KeyboardEvent, useEffect } from 'react'
 
+import {
+  bindApi,
+  type ChannelInfo,
+  getHistory,
+  getMembers,
+  listChannels,
+  postMessage as apiPostMessage,
+  type RestFn,
+  type MessageInfo,
+} from './api'
+
 // ---------------------------------------------------------------------------
 // State atoms (plugin-local nanostores)
 // ---------------------------------------------------------------------------
 
 const $channels = atom<ChannelInfo[]>([])
 const $activeChannel = atom<string | null>(null)
-const $messages = atom<Message[]>([])
+const $messages = atom<MessageInfo[]>([])
 const $unread = atom<Record<string, number>>({})
 const $members = atom<string[]>([])
 const $composer = atom('')
 const $autocomplete = atom<string[]>([])
 const $loading = atom(false)
 
-interface ChannelInfo {
-  id: string
-  name: string
-  member_count: number
-}
-
-interface Message {
-  id: string
-  author_handle: string
-  body: string
-  created_at: string
-  mentions: string[]
-}
-
-// ---------------------------------------------------------------------------
-// Backend API helpers
-// ---------------------------------------------------------------------------
-
-type RestFn = <T>(path: string, opts?: { method?: string; body?: unknown }) => Promise<T>
-
-let rest: RestFn | null = null
-
-/** Bind the REST door injected at register time. Called from register(ctx). */
-function bindApi(r: RestFn): void {
-  rest = r
-}
-
-async function fetchChannels(): Promise<ChannelInfo[]> {
-  if (!rest) {
-    return []
-  }
-  return rest<ChannelInfo[]>('/channels')
-}
-
-async function fetchHistory(channelId: string, limit = 50): Promise<Message[]> {
-  if (!rest) {
-    return []
-  }
-  return rest<Message[]>(`/channels/${channelId}/history?limit=${limit}`)
-}
-
-async function fetchMembers(channelId: string): Promise<string[]> {
-  if (!rest) {
-    return []
-  }
-  return rest<string[]>(`/channels/${channelId}/members`)
-}
-
-async function postMessage(channelId: string, body: string): Promise<Message> {
-  if (!rest) {
-    return { id: '', author_handle: '', body: '', created_at: '', mentions: [] }
-  }
-  return rest<Message>(`/channels/${channelId}/post`, { method: 'POST', body: { body } })
-}
-
 // ---------------------------------------------------------------------------
 // Autocomplete logic (REQ-VEC-007-5)
 // ---------------------------------------------------------------------------
 
 function computeAutocomplete(text: string, members: string[]): string[] {
-  // Match @<partial> at the end of the text.
   const match = text.match(/@(\w+)$/)
   if (!match) {
     return []
@@ -144,6 +97,7 @@ function ChannelRow({ channel }: { channel: ChannelInfo }) {
 
   return (
     <button
+      data-testid={`vector-channel-${channel.name}`}
       className={cn(
         'flex w-full items-center justify-between rounded-md px-3 py-1.5 text-sm transition-colors',
         isActive
@@ -170,9 +124,9 @@ function ChannelRow({ channel }: { channel: ChannelInfo }) {
   )
 }
 
-function MessageRow({ msg }: { msg: Message }) {
+function MessageRow({ msg }: { msg: MessageInfo }) {
   return (
-    <div className="message-row">
+    <div className="message-row" data-testid={`vector-message-${msg.author_handle}`}>
       <span className="message-author">@{msg.author_handle}</span>
       <span className="message-time">{new Date(msg.created_at).toLocaleTimeString()}</span>
       <p className="message-body">{msg.body}</p>
@@ -202,7 +156,7 @@ function Composer() {
   }
 
   return (
-    <div className="composer">
+    <div className="composer" data-testid="vector-composer">
       {suggestions.length > 0 && (
         <div className="autocomplete-list">
           {suggestions.map(s => (
@@ -210,7 +164,6 @@ function Composer() {
               className="autocomplete-item"
               key={s}
               onClick={() => {
-                // Replace @partial with @suggestion
                 const text = $composer.get().replace(/@(\w+)$/, `@${s} `)
                 $composer.set(text)
                 $autocomplete.set([])
@@ -236,29 +189,21 @@ function Composer() {
 async function postAndDispatch(channelId: string, body: string): Promise<void> {
   $loading.set(true)
   try {
-    // Post the user message.
-    const userMsg = await postMessage(channelId, body)
-    const msgs = $messages.get()
-    $messages.set([...msgs, userMsg])
-
-    // The backend dispatcher processes mentions and posts agent replies.
-    // Poll for new messages to get the agent responses.
-    // In v0 we poll; in v1 the backend can push via WebSocket.
-    await pollForReplies(channelId)
+    const result = await apiPostMessage(channelId, 'human', body, true)
+    // The response includes the user message AND agent responses.
+    // Render all returned messages immediately — no polling needed.
+    const allMsgs = result.messages
+    if (allMsgs.length > 0) {
+      $messages.set(allMsgs)
+    } else {
+      // Fallback: at least show the user message
+      const msgs = $messages.get()
+      $messages.set([...msgs, result.message])
+    }
+  } catch {
+    // Error state — non-fatal, preserves existing messages
   } finally {
     $loading.set(false)
-  }
-}
-
-async function pollForReplies(channelId: string, maxPolls = 10, intervalMs = 500): Promise<void> {
-  const initial = $messages.get().length
-  for (let i = 0; i < maxPolls; i++) {
-    await new Promise(resolve => setTimeout(resolve, intervalMs))
-    const history = await fetchHistory(channelId, 50)
-    if (history.length > initial) {
-      $messages.set(history)
-      return
-    }
   }
 }
 
@@ -266,8 +211,8 @@ async function loadChannelData(channelId: string): Promise<void> {
   $loading.set(true)
   try {
     const [history, members] = await Promise.all([
-      fetchHistory(channelId, 50),
-      fetchMembers(channelId),
+      getHistory(channelId, 50),
+      getMembers(channelId),
     ])
     $messages.set(history)
     $members.set(members)
@@ -282,14 +227,13 @@ function ChannelsPage() {
   const activeChannel = useValue($activeChannel)
   const loading = useValue($loading)
 
-  // Load channels on mount.
   useEffect(() => {
-    void fetchChannels().then(chs => $channels.set(chs))
+    void listChannels().then(chs => $channels.set(chs))
   }, [])
 
   return (
-    <div className="vector-page">
-      <aside className="vector-sidebar">
+    <div className="vector-page" data-testid="vector-nav">
+      <aside className="vector-sidebar" data-testid="vector-channel-list">
         <h2 className="sidebar-title">Channels</h2>
         {channels.map(ch => (
           <ChannelRow channel={ch} key={ch.id} />
@@ -301,7 +245,7 @@ function ChannelsPage() {
       <main className="vector-main">
         {activeChannel ? (
           <>
-            <div className="message-list">
+            <div className="message-list" data-testid="vector-message-list">
               {messages.map(msg => (
                 <MessageRow key={msg.id} msg={msg} />
               ))}
@@ -329,8 +273,6 @@ function UnreadBadge() {
   const unread = useValue($unread)
   const total = totalUnread()
 
-  // Listen for new messages while not viewing a channel.
-  // Poll-based in v0; v1 can use ctx.socket when available.
   useEffect(() => {
     // No-op: live events not available in v0. Polling handles this.
   }, [])
@@ -363,7 +305,7 @@ const plugin: HermesPlugin = {
   name: 'Vector Channels',
   defaultEnabled: false,
   register(ctx) {
-    // Bind the REST door (namespace-scoped to /api/plugins/vector-channels).
+    // Bind the REST door. api.ts calls /api/vector/* endpoints.
     bindApi(ctx.rest as RestFn)
 
     ctx.registerMany([
@@ -412,7 +354,7 @@ export {
   computeAutocomplete,
   incrementUnread,
   markRead,
-  type Message,
+  type MessageInfo,
   type RestFn,
   totalUnread,
 }
