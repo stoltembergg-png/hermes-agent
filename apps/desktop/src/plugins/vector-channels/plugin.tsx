@@ -14,15 +14,11 @@
 import './vector-channels.css'
 
 import {
-  type ChannelInfo,
   Codicon,
   type HermesPlugin,
-  type KeyboardEvent,
-  type Message,
   PALETTE_AREA,
   type PaletteContribution,
   ROUTES_AREA,
-  type RestFn,
   type RouteContribution,
   SIDEBAR_NAV_AREA,
   type SidebarNavContribution,
@@ -32,7 +28,7 @@ import {
   host,
   useValue,
 } from '@hermes/plugin-sdk'
-import { type ChangeEvent, useEffect } from 'react'
+import { type ChangeEvent, type KeyboardEvent, useEffect } from 'react'
 
 // ---------------------------------------------------------------------------
 // State atoms (plugin-local nanostores)
