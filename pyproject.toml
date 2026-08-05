@@ -472,6 +472,12 @@ markers = [
     "ac_vec_007_4: PR-007 AC 4 — @gandalf hello triggers reply",
     "ac_vec_007_5: PR-007 AC 5 — @gan suggests @gandalf",
     "ac_vec_007_6: PR-007 AC 6 — no nodeIntegration, context-isolated",
+    "ac_vec_008_1: PR-008 AC 1 — end-to-end dispatch cycle",
+    "ac_vec_008_2: PR-008 AC 2 — YAML round-trip preserves profiles",
+    "ac_vec_008_3: PR-008 AC 3 — mention extraction with code-fence exclusion",
+    "ac_vec_008_4: PR-008 AC 4 — FTS5 full-text search",
+    "ac_vec_008_5: PR-008 AC 5 — CLI cross-process persistence",
+    "ac_vec_008_6: PR-008 AC 6 — no regression on core objects",
 ]
 # integration tests take way too long to run in the normal CI environments
 addopts = "-m 'not integration'"
