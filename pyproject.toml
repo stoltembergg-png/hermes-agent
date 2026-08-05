@@ -439,6 +439,16 @@ markers = [
     "ac_vec_003_6: PR-003 AC 6 — FTS5 search",
     "ac_vec_003_7: PR-003 AC 7 — soft/hard member limits",
     "ac_vec_003_8: PR-003 AC 8 — DM cap of exactly 2",
+    # PR-004 — agent runtime
+    "ac_vec_004_1: PR-004 AC 1 — run returns ok with output",
+    "ac_vec_004_2: PR-004 AC 2 — system prompt + handle prefix",
+    "ac_vec_004_3: PR-004 AC 3 — tools propagate to delegate",
+    "ac_vec_004_4: PR-004 AC 4 — model propagates to delegate",
+    "ac_vec_004_5: PR-004 AC 5 — timeout returns status=timeout",
+    "ac_vec_004_6: PR-004 AC 6 — delegate raises → status=error",
+    "ac_vec_004_7: PR-004 AC 7 — fallback on transient error",
+    "ac_vec_004_8: PR-004 AC 8 — all fallbacks fail → chain summary",
+    "ac_vec_004_9: PR-004 AC 9 — non-transient error no fallback",
 ]
 # integration tests take way too long to run in the normal CI environments
 addopts = "-m 'not integration'"
