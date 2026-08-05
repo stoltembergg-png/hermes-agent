@@ -430,6 +430,15 @@ markers = [
     "ac_vec_002_4: PR-002 AC 4 — fenced + inline code excluded",
     "ac_vec_002_5: PR-002 AC 5 — dedup + order preserved",
     "ac_vec_002_6: PR-002 AC 6 — determinism",
+    # PR-003 — channel store
+    "ac_vec_003_1: PR-003 AC 1 — create round-trip",
+    "ac_vec_003_2: PR-003 AC 2 — duplicate membership raises",
+    "ac_vec_003_3: PR-003 AC 3 — unregistered handle raises",
+    "ac_vec_003_4: PR-003 AC 4 — post extracts mentions",
+    "ac_vec_003_5: PR-003 AC 5 — history chronological",
+    "ac_vec_003_6: PR-003 AC 6 — FTS5 search",
+    "ac_vec_003_7: PR-003 AC 7 — soft/hard member limits",
+    "ac_vec_003_8: PR-003 AC 8 — DM cap of exactly 2",
 ]
 # integration tests take way too long to run in the normal CI environments
 addopts = "-m 'not integration'"
