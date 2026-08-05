@@ -456,6 +456,15 @@ markers = [
     "ac_vec_005_4: PR-005 AC 4 — recursion cap depth 3",
     "ac_vec_005_5: PR-005 AC 5 — history contains original + response",
     "ac_vec_005_6: PR-005 AC 6 — sequential order a then b",
+    # PR-006 — CLI
+    "ac_vec_006_1: PR-006 AC 1 — agents add persists across process",
+    "ac_vec_006_2: PR-006 AC 2 — agents list prints both",
+    "ac_vec_006_3: PR-006 AC 3 — channels add with members",
+    "ac_vec_006_4: PR-006 AC 4 — channels list shows count",
+    "ac_vec_006_5: PR-006 AC 5 — scripted REPL",
+    "ac_vec_006_6: PR-006 AC 6 — version",
+    "ac_vec_006_7: PR-006 AC 7 — hard cap raises",
+    "ac_vec_006_8: PR-006 AC 8 — add-team atomic rollback",
 ]
 # integration tests take way too long to run in the normal CI environments
 addopts = "-m 'not integration'"
