@@ -50,7 +50,7 @@ jobs:
       - name: Install FastAPI + Pydantic + PyYAML + httpx
         run: |
           pip install --disable-pip-version-check --quiet \
-            fastapi pydantic pyyaml pytest httpx
+            fastapi pydantic pyyaml pytest httpx httpx2
 
       - name: Ruff
         run: |

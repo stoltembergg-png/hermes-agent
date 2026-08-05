@@ -92,11 +92,11 @@ if [ -z "$PYTEST" ]; then
     # Re-detect path after bootstrap.
     if [ -x "$VECTOR_DIR/.venv/Scripts/python.exe" ]; then
         PYTEST="$VECTOR_DIR/.venv/Scripts/python.exe"
-        ( cd "$VECTOR_DIR" && "$UV" pip install --python "$PYTEST" pytest pyyaml fastapi pydantic httpx >/dev/null ) \
+        ( cd "$VECTOR_DIR" && "$UV" pip install --python "$PYTEST" pytest pyyaml fastapi pydantic httpx httpx2 >/dev/null ) \
             || { echo "error: uv pip install failed" >&2; exit 3; }
     else
         PYTEST="$VECTOR_DIR/.venv/bin/python"
-        ( cd "$VECTOR_DIR" && "$UV" pip install --python "$PYTEST" pytest pyyaml fastapi pydantic httpx >/dev/null ) \
+        ( cd "$VECTOR_DIR" && "$UV" pip install --python "$PYTEST" pytest pyyaml fastapi pydantic httpx httpx2 >/dev/null ) \
             || { echo "error: uv pip install failed" >&2; exit 3; }
     fi
 fi
