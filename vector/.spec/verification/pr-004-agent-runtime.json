@@ -1,0 +1,26 @@
+{
+  "feature": "pr-004-agent-runtime",
+  "status": "pass",
+  "exit_code": 0,
+  "pytest_exit_code": 0,
+  "git": {
+    "sha": "c65bb7f415e94b3ad9c17641f174ae40cff11bc7",
+    "branch": "main",
+    "dirty": true
+  },
+  "platform": "MINGW64_NT-10.0-26100 3.6.7-fb42d713.x86_64 x86_64",
+  "tools": {
+    "python": "Python 3.11.15",
+    "pytest": "pytest 9.1.1"
+  },
+  "spec_file": ".spec/features/pr-004-agent-runtime/spec.md",
+  "test_file": "tests/test_pr_004_agent_runtime.py",
+  "marker_expression": "ac_vec_004_1 or ac_vec_004_2 or ac_vec_004_3 or ac_vec_004_4 or ac_vec_004_5 or ac_vec_004_6 or ac_vec_004_7 or ac_vec_004_8 or ac_vec_004_9",
+  "summary": {
+    "spec_ac_count": 9,
+    "passed_count": 9,
+    "failed_count": 0,
+    "missing_count": 0
+  },
+  "details": [ {"ac": "AC-VEC-004-1", "status": "pass"} , {"ac": "AC-VEC-004-2", "status": "pass"} , {"ac": "AC-VEC-004-3", "status": "pass"} , {"ac": "AC-VEC-004-4", "status": "pass"} , {"ac": "AC-VEC-004-5", "status": "pass"} , {"ac": "AC-VEC-004-6", "status": "pass"} , {"ac": "AC-VEC-004-7", "status": "pass"} , {"ac": "AC-VEC-004-8", "status": "pass"} , {"ac": "AC-VEC-004-9", "status": "pass"} ]
+}
