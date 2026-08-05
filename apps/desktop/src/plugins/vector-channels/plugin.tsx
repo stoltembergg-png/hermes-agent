@@ -35,8 +35,8 @@ import {
   getMembers,
   listChannels,
   postMessage as apiPostMessage,
-  type RestFn,
   type MessageInfo,
+  type RestFn,
 } from './api'
 
 // ---------------------------------------------------------------------------
@@ -97,13 +97,13 @@ function ChannelRow({ channel }: { channel: ChannelInfo }) {
 
   return (
     <button
-      data-testid={`vector-channel-${channel.name}`}
       className={cn(
         'flex w-full items-center justify-between rounded-md px-3 py-1.5 text-sm transition-colors',
         isActive
           ? 'bg-(--ui-bg-active) text-foreground'
           : 'text-(--ui-text-secondary) hover:bg-(--chrome-action-hover)',
       )}
+      data-testid={`vector-channel-${channel.name}`}
       onClick={() => {
         $activeChannel.set(channel.id)
         markRead(channel.id)
