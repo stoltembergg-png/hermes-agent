@@ -390,3 +390,83 @@ def test_ac_vec_009_6_validation_error_envelope(client, vector_env):
     assert resp.status_code in (422, 400)
     # Should not expose traceback
     assert "traceback" not in resp.text.lower()
+
+
+# ---------------------------------------------------------------------------
+# AC-009-7: Response includes user + agent messages (API contract)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.ac_vec_009_7
+def test_ac_vec_009_7_response_includes_both_messages(client, vector_env):
+    """POST returns both user and agent messages in the response."""
+    vector_env.create_agent(handle="gandalf", system_prompt="Wise")
+    ch = vector_env.create_channel(name="dev", members=["gandalf", "human"])
+    resp = client.post(
+        f"/api/vector/channels/{ch.id}/messages",
+        json={"author_handle": "human", "body": "@gandalf hello", "dispatch": True},
+    )
+    assert resp.status_code == 200
+    result = resp.json()
+    assert "messages" in result
+    authors = [m["author_handle"] for m in result["messages"]]
+    assert "human" in authors
+    assert "gandalf" in authors
+
+
+# ---------------------------------------------------------------------------
+# AC-009-8: History endpoint retains chronological order
+# ---------------------------------------------------------------------------
+
+@pytest.mark.ac_vec_009_8
+def test_ac_vec_009_8_history_chronological(client, vector_env):
+    """GET messages returns chronological history with user before agent."""
+    vector_env.create_agent(handle="gandalf", system_prompt="Wise")
+    ch = vector_env.create_channel(name="dev", members=["gandalf", "human"])
+    client.post(
+        f"/api/vector/channels/{ch.id}/messages",
+        json={"author_handle": "human", "body": "@gandalf hi", "dispatch": True},
+    )
+    resp = client.get(f"/api/vector/channels/{ch.id}/messages?limit=50")
+    assert resp.status_code == 200
+    history = resp.json()["messages"]
+    assert len(history) >= 2
+    assert history[0]["author_handle"] == "human"
+    assert history[1]["author_handle"] == "gandalf"
+
+
+# ---------------------------------------------------------------------------
+# AC-009-9: Hermetic — no provider keys required
+# ---------------------------------------------------------------------------
+
+@pytest.mark.ac_vec_009_9
+def test_ac_vec_009_9_hermetic_no_keys(client, vector_env):
+    """Tests run without any API keys — fake delegate is used."""
+    vector_env.create_agent(handle="gandalf", system_prompt="Wise")
+    ch = vector_env.create_channel(name="dev", members=["gandalf", "human"])
+    resp = client.post(
+        f"/api/vector/channels/{ch.id}/messages",
+        json={"author_handle": "human", "body": "@gandalf test", "dispatch": True},
+    )
+    assert resp.status_code == 200
+    entry = resp.json()["dispatch"]["entries"][0]
+    assert entry["status"] == "ok"
+    assert entry["response"]  # non-empty deterministic response
+
+
+# ---------------------------------------------------------------------------
+# AC-009-10: Error evidence includes structured data
+# ---------------------------------------------------------------------------
+
+@pytest.mark.ac_vec_009_10
+def test_ac_vec_009_10_error_evidence_structured(client, vector_env):
+    """Error responses include structured error code and message."""
+    resp = client.post(
+        "/api/vector/channels/nonexistent/messages",
+        json={"author_handle": "human", "body": "test"},
+    )
+    assert resp.status_code == 404
+    data = resp.json()
+    assert "error" in data
+    assert "code" in data["error"]
+    assert "message" in data["error"]
+    assert data["error"]["code"] == "VECTOR_CHANNEL_NOT_FOUND"
