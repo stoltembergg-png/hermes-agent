@@ -25,15 +25,16 @@ describe('computeAutocomplete', () => {
     expect(result).toContain('gandalf_clone')
   })
 
-  it('returns exact match only when @sre is typed', () => {
+  it('includes exact match when @sre is typed', () => {
     expect(computeAutocomplete('hi @sre', members)).toEqual(['sre'])
   })
 
-  it('excludes the exact partial match itself', () => {
-    // @gandalf should NOT return gandalf (it IS the partial)
-    expect(computeAutocomplete('hi @gandalf', members)).not.toContain('gandalf')
-    expect(computeAutocomplete('hi @gandalf', members)).toContain('gandalf2')
-    expect(computeAutocomplete('hi @gandalf', members)).toContain('gandalf_clone')
+  it('returns all @gandalf variants when @gandalf is typed', () => {
+    // Exact match AND partial matches are all returned.
+    const result = computeAutocomplete('hi @gandalf', members)
+    expect(result).toContain('gandalf')
+    expect(result).toContain('gandalf2')
+    expect(result).toContain('gandalf_clone')
   })
 
   it('returns empty for no @ mention', () => {
@@ -50,7 +51,7 @@ describe('computeAutocomplete', () => {
 
   it('returns all matching for @ga prefix', () => {
     const result = computeAutocomplete('@ga', members)
-    expect(result.length).toBe(3)
+    expect(result.length).toBe(4)
   })
 
   it('works with a long message before the @', () => {

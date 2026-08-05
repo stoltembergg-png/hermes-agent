@@ -91,7 +91,7 @@ function computeAutocomplete(text: string, members: string[]): string[] {
   const match = text.match(/@(\w+)$/)
   if (!match) return []
   const partial = match[1].toLowerCase()
-  return members.filter(m => m.toLowerCase().startsWith(partial) && m.toLowerCase() !== partial)
+  return members.filter(m => m.toLowerCase().startsWith(partial))
 }
 
 // ---------------------------------------------------------------------------
