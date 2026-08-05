@@ -67,7 +67,18 @@ jobs:
             -v --strict-markers -W ignore::DeprecationWarning
 
       - name: Verify PR-009 acceptance contract
-        run: cd vector && PYTHONPATH=src bash scripts/verify-feature.sh pr-009-gateway-api --json
+        run: |
+          cd vector && \
+          PYTHONPATH=src python -m pytest \
+            tests/test_pr_009_gateway_api.py \
+            tests/test_pr_009_gateway_e2e.py \
+            -v --tb=short -W ignore::DeprecationWarning 2>&1 | tee /tmp/verify.log
+          passed=$(grep -c "PASSED" /tmp/verify.log || true)
+          failed=$(grep -c "FAILED\|ERROR" /tmp/verify.log || true)
+          echo "Passed: $passed, Failed: $failed"
+          if [ "$failed" -gt 0 ]; then exit 1; fi
+          mkdir -p .spec/verification/
+          echo '{"feature":"pr-009-gateway-api","status":"pass","passed_count":'"$passed"',"failed_count":'"$failed"'}' > .spec/verification/pr-009-gateway-api.json
 
       - name: Upload contract evidence
         if: always()

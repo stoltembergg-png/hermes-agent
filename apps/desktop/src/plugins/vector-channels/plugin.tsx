@@ -29,11 +29,11 @@ import {
 import { type ChangeEvent, type KeyboardEvent, useEffect } from 'react'
 
 import {
+  postMessage as apiPostMessage,
   bindApi,
   type ChannelInfo,
   getHistory,
   getMembers,
-  postMessage as apiPostMessage,
   listChannels,
   type MessageInfo,
   type RestFn,
