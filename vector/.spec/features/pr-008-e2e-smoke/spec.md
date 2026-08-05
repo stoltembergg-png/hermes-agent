@@ -16,4 +16,4 @@ End-to-end regression tests for vector v0 that exercise the full stack
 
 ## test_file
 
-tests/test_pr_008_e2e_smoke.py
+test_file: tests/test_pr_008_e2e_smoke.py
