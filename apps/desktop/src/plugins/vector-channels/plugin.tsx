@@ -413,6 +413,6 @@ export {
   incrementUnread,
   markRead,
   type Message,
-  totalUnread,
   type RestFn,
+  totalUnread,
 }
