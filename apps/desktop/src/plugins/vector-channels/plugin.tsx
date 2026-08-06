@@ -26,7 +26,7 @@ import {
   STATUSBAR_AREAS,
   useValue,
 } from '@hermes/plugin-sdk'
-import { type ChangeEvent, type KeyboardEvent, useEffect, useState } from 'react'
+import { type ChangeEvent, type KeyboardEvent, useEffect, useRef, useState } from 'react'
 
 import {
   postMessage as apiPostMessage,
@@ -49,6 +49,7 @@ import {
 
 const $channels = atom<ChannelInfo[]>([])
 const $activeChannel = atom<string | null>(null)
+const $channelName = atom<string | null>(null)
 const $messages = atom<MessageInfo[]>([])
 const $unread = atom<Record<string, number>>({})
 const $members = atom<string[]>([])
@@ -114,6 +115,7 @@ function ChannelRow({ channel }: { channel: ChannelInfo }) {
       data-testid={`vector-channel-${channel.name}`}
       onClick={() => {
         $activeChannel.set(channel.id)
+        $channelName.set(channel.name)
         markRead(channel.id)
         void loadChannelData(channel.id)
       }}
@@ -444,6 +446,12 @@ async function loadChannelData(channelId: string): Promise<void> {
     ])
     $messages.set(history)
     $members.set(members)
+    // Set channel name from $channels lookup
+    const chs = $channels.get()
+    const ch = chs.find(c => c.id === channelId)
+    if (ch) {
+      $channelName.set(ch.name)
+    }
   } finally {
     $loading.set(false)
   }
@@ -455,16 +463,54 @@ async function postAndDispatch(channelId: string, body: string): Promise<void> {
     const result = await apiPostMessage(channelId, 'human', body, true)
     const allMsgs = result.messages
     if (allMsgs.length > 0) {
-      $messages.set(allMsgs)
+      // Merge: dedup by message ID, preserving order
+      const existing = $messages.get()
+      const ids = new Set(existing.map(m => m.id))
+      const newMsgs = allMsgs.filter(m => !ids.has(m.id))
+      $messages.set([...existing, ...newMsgs])
     } else {
       const msgs = $messages.get()
-      $messages.set([...msgs, result.message])
+      const ids = new Set(msgs.map(m => m.id))
+      if (!ids.has(result.message.id)) {
+        $messages.set([...msgs, result.message])
+      }
     }
   } catch {
     // Error state — non-fatal, preserves existing messages
   } finally {
     $loading.set(false)
   }
+}
+
+// ---------------------------------------------------------------------------
+// Channel header — shows channel name + member chips
+// ---------------------------------------------------------------------------
+
+function ChannelHeader() {
+  const channelName = useValue($channelName)
+  const members = useValue($members)
+
+  if (!channelName) {
+    return null
+  }
+
+  return (
+    <div className="vector-channel-header" data-testid="vector-channel-header">
+      <h3 className="vector-channel-name">
+        <Codicon name="comment-discussion" size="0.875rem" />
+        {channelName}
+      </h3>
+      <div className="vector-channel-members">
+        <span className="vector-member-count">{members.length} members</span>
+        {members.map(m => (
+          <span className="vector-member-chip" key={m}>
+            <Codicon name={m === 'human' ? 'account' : 'robot'} size="0.625rem" />
+            @{m}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -480,6 +526,15 @@ function ChannelsPage() {
   const showCreateChannel = useValue($showCreateChannel)
   const showAddAgent = useValue($showAddAgent)
   const agents = useValue($agents)
+
+  const messageListRef = useRef<HTMLDivElement>(null)
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    if (messageListRef.current) {
+      messageListRef.current.scrollTop = messageListRef.current.scrollHeight
+    }
+  }, [messages])
 
   useEffect(() => {
     void (async () => {
@@ -536,7 +591,15 @@ function ChannelsPage() {
           </div>
         ) : activeChannel ? (
           <>
-            <div className="message-list" data-testid="vector-message-list">
+            <ChannelHeader />
+            <div className="message-list" data-testid="vector-message-list" ref={messageListRef}>
+              {messages.length === 0 && !loading && (
+                <div className="vector-no-messages" data-testid="vector-no-messages">
+                  <Codicon name="comment-discussion" size="1.5rem" />
+                  <p>No messages yet.</p>
+                  <p className="vector-hint">Start chatting below — use @handle to mention agents</p>
+                </div>
+              )}
               {messages.map(msg => (
                 <MessageRow key={msg.id} msg={msg} />
               ))}
