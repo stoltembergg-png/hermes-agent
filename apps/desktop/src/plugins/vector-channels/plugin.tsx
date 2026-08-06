@@ -37,9 +37,11 @@ import {
   getHealth,
   getHistory,
   getMembers,
+  getModelOptions,
   listAgents,
   listChannels,
   type MessageInfo,
+  type ModelOptionProvider,
   parseApiError,
   type RestFn,
 } from './api'
@@ -311,6 +313,35 @@ function AddAgentModal() {
   const [prompt, setPrompt] = useState('')
   const [creating, setCreating] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  // PR-013: provider/model picker state. Empty string === "inherit
+  // session defaults" (omitted from the createAgent request entirely).
+  const [providers, setProviders] = useState<ModelOptionProvider[]>([])
+  const [provider, setProvider] = useState('')
+  const [model, setModel] = useState('')
+
+  // Fetch the Hermes model catalog once on modal mount so the Advanced
+  // dropdowns are populated. A fetch failure is non-fatal — the user can
+  // still create an agent with session-inherited defaults (both selects
+  // just stay empty).
+  useEffect(() => {
+    let cancelled = false
+    void getModelOptions()
+      .then(res => {
+        if (cancelled) {
+          return
+        }
+        setProviders(res.providers)
+      })
+      .catch(() => {
+        // Catalog unavailable — silently leave the dropdowns empty.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // Models for the currently-selected provider (empty until one is picked).
+  const modelOptions = providers.find(p => p.slug === provider)?.models ?? []
 
   const handleCreate = async () => {
     if (!handle.trim() || !prompt.trim()) {
@@ -319,16 +350,27 @@ function AddAgentModal() {
     setCreating(true)
     setErr(null)
     try {
-      await createAgent({
+      // Omit model/provider when empty so the backend uses session defaults
+      // (createAgent already types them as optional).
+      const req: Parameters<typeof createAgent>[0] = {
         handle: handle.trim(),
         system_prompt: prompt.trim(),
-      })
+      }
+      if (provider) {
+        req.provider = provider
+      }
+      if (model) {
+        req.model = model
+      }
+      await createAgent(req)
       // Refresh agents
       const agentList = await listAgents()
       $agents.set(agentList.map(a => a.handle))
       $showAddAgent.set(false)
       setHandle('')
       setPrompt('')
+      setProvider('')
+      setModel('')
     } catch (e) {
       setErr(parseApiError(e))
     } finally {
@@ -367,6 +409,43 @@ function AddAgentModal() {
               value={prompt}
             />
           </label>
+          <details className="vector-modal-details" data-testid="vector-add-agent-advanced">
+            <summary>Advanced</summary>
+            <label className="vector-modal-label">
+              Provider
+              <select
+                className="vector-modal-input"
+                data-testid="vector-add-agent-provider"
+                onChange={e => {
+                  setProvider(e.target.value)
+                  // Reset model when the provider changes so we never submit a
+                  // stale model that doesn't belong to the new provider.
+                  setModel('')
+                }}
+                value={provider}
+              >
+                <option value="">Inherit from session</option>
+                {providers.map(p => (
+                  <option key={p.slug} value={p.slug}>{p.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="vector-modal-label">
+              Model
+              <select
+                className="vector-modal-input"
+                data-testid="vector-add-agent-model"
+                disabled={!provider}
+                onChange={e => setModel(e.target.value)}
+                value={model}
+              >
+                <option value="">Inherit</option>
+                {modelOptions.map(m => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            </label>
+          </details>
           {err && <p className="vector-modal-error">{err}</p>}
         </div>
         <div className="vector-modal-footer">

@@ -123,6 +123,47 @@ async def health() -> JSONResponse:
     return JSONResponse({"status": "ok", "version": "0.1.0", "storage": svc.health_storage()})
 
 
+@router.get("/models")
+async def list_models() -> JSONResponse:
+    """Return the Hermes provider/model catalog (PR-013).
+
+    This is the same shape as the dashboard ``/api/model/options`` endpoint
+    and the TUI ``model.options`` JSON-RPC method — the canonical picker
+    payload built by ``hermes_cli.inventory.build_model_options_payload``.
+
+    Importantly, this does NOT touch the VectorService: the model catalog is
+    a Hermes-core concern (provider credentials, curated model lists,
+    pricing). The Add Agent modal uses this to populate its provider/model
+    <select> dropdowns. Empty provider/model on the agent-create request
+    means "inherit session defaults"; explicit values here let the user
+    pin an agent to a specific model.
+    """
+    try:
+        from hermes_cli.inventory import (
+            build_model_options_payload,
+            load_picker_context,
+        )
+
+        payload = build_model_options_payload(load_picker_context())
+        # Trim each provider row to the fields the desktop picker needs so we
+        # don't ship pricing/capabilities blobs the UI never renders.
+        providers = []
+        for row in payload.get("providers", []):
+            providers.append({
+                "slug": row.get("slug"),
+                "name": row.get("name") or row.get("slug"),
+                "models": list(row.get("models") or []),
+            })
+        return JSONResponse({
+            "providers": providers,
+            "model": payload.get("model") or "",
+            "provider": payload.get("provider") or "",
+        })
+    except Exception as e:
+        log.exception("vector-channels GET /models failed")
+        return _err("VECTOR_MODEL_OPTIONS_FAILED", str(e), 500)
+
+
 @router.get("/agents")
 async def list_agents() -> JSONResponse:
     svc = _get_service()
