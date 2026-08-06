@@ -285,8 +285,10 @@ class ChannelStore:
         """
         channel = self.get(channel_id)
 
-        # --- validate agent is registered ---
-        if self.registry is not None:
+        # --- validate agent is registered — 'human' is always allowed ---
+        if handle == "human":
+            pass  # The user is always a valid member.
+        elif self.registry is not None:
             try:
                 if self.registry.get(handle) is None:
                     raise NotAMemberError(
