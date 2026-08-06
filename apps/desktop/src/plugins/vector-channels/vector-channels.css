@@ -508,57 +508,44 @@
   margin-top: 0;
 }
 
-/* PR-019: Message timestamps + author avatars */
+/* PR-015: Sidebar button icons + UX clarity */
 
-.vector-message-row {
-  display: flex;
-  gap: 0.75rem;
-  padding: 0.5rem 1rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.vector-message-avatar {
-  width: 2rem;
-  height: 2rem;
-  border-radius: 50%;
-  background: rgba(99, 102, 241, 0.2);
-  border: 1px solid rgba(99, 102, 241, 0.4);
-  display: flex;
+.vector-sidebar-btn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
-  flex-shrink: 0;
+  color: var(--ui-text-secondary);
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
-.vector-message-content {
-  flex: 1;
-  min-width: 0;
+.vector-sidebar-btn:hover {
+  background: var(--chrome-action-hover, rgba(128, 128, 128, 0.15));
+  color: var(--ui-text-primary, inherit);
 }
 
-.vector-message-header {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-  margin-bottom: 0.15rem;
+.vector-channel-badge {
+  font-size: 0.625rem;
+  color: var(--ui-text-secondary, #888);
+  background: rgba(128, 128, 128, 0.12);
+  padding: 0 0.35rem;
+  border-radius: 8px;
+  line-height: 1.2rem;
+  font-weight: 500;
+  tabular-nums: true;
 }
 
-.vector-message-author {
-  font-weight: 600;
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.95);
+.vector-channel-row:hover {
+  background: var(--chrome-action-hover, rgba(128, 128, 128, 0.08));
 }
 
-.vector-message-time {
-  font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.4);
-}
-
-.vector-message-body {
-  margin: 0;
-  font-size: 0.85rem;
-  line-height: 1.4;
-  color: rgba(255, 255, 255, 0.8);
-  word-wrap: break-word;
+.vector-sidebar-keyboard-hint {
+  font-size: 0.6875rem;
+  color: var(--ui-text-tertiary, #999);
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid var(--ui-border, rgba(128, 128, 128, 0.15));
+  margin-top: 0.5rem;
 }

@@ -134,6 +134,11 @@ function ChannelRow({ channel }: { channel: ChannelInfo }) {
       <span className="flex items-center gap-1.5">
         <Codicon name="comment-discussion" size="0.75rem" />
         <span>{channel.name}</span>
+        {channel.members && channel.members.length > 0 && (
+          <span className="vector-channel-badge" data-testid={`vector-channel-badge-${channel.name}`}>
+            {channel.members.length}
+          </span>
+        )}
       </span>
       {count > 0 && (
         <span className="rounded-full bg-(--ui-accent) px-1.5 text-[0.625rem] tabular-nums text-white">
@@ -504,25 +509,25 @@ function SidebarHeader() {
       <h2 className="sidebar-title">Channels</h2>
       <div className="vector-sidebar-actions">
         <button
-          className="vector-icon-btn"
+          className="vector-sidebar-btn"
           onClick={() => void refreshAgents()}
-          title="Add Agent"
+          title="Refresh agents"
           type="button"
         >
-          <Codicon name="robot" size="0.875rem" />
+          <Codicon name="sync" size="0.875rem" />
         </button>
         <button
-          className="vector-icon-btn"
+          className="vector-sidebar-btn"
           onClick={() => $showAddAgent.set(true)}
-          title="Add Agent"
+          title="Add agent"
           type="button"
         >
-          <Codicon name="add" size="0.875rem" />
+          <Codicon name="new-file" size="0.875rem" />
         </button>
         <button
-          className="vector-icon-btn"
+          className="vector-sidebar-btn"
           onClick={() => $showCreateChannel.set(true)}
-          title="Create Channel"
+          title="Create channel"
           type="button"
         >
           <Codicon name="add" size="0.875rem" />
