@@ -1,24 +1,23 @@
 # PERSONAL.md
 
-This repository (`stoltembergg-png/hermes-agent`) is a **personal working copy** of the
-[Hermes Agent](https://github.com/NousResearch/hermes-agent) codebase by Gabriel Stoltemberg.
+Este repositório (`stoltembergg-png/hermes-agent`) é uma **cópia de trabalho pessoal** do
+[Hermes Agent](https://github.com/NousResearch/hermes-agent) por Gabriel Stoltemberg.
 
-## Purpose
+## Propósito
 
-- **Not a fork.** This is a read-reference clone used for developing the `vector`
-  multi-agent orchestration layer and related desktop plugins.
-- **No code changes to core Hermes.** All work lives in `vector/`, `plugins/`, and
-  `apps/desktop/src/plugins/` — the Hermes core remains upstream-compatible.
-- **Sync policy.** This copy tracks `NousResearch/hermes-agent` `main` as `upstream`.
-  Rebase periodically; never force-push to `upstream`.
+- **Não é um fork.** Cópia de referência para desenvolver a camada `vector`
+  de orquestração multi-agente e plugins de desktop relacionados.
+- **Sem mudanças no core do Hermes.** Todo o trabalho vive em `vector/`, `plugins/`,
+  e `apps/desktop/src/plugins/` — o core permanece upstream-compatible.
+- **Sync policy.** Tracks `NousResearch/hermes-agent` `main` como upstream.
+  Rebase periódico; nunca force-push para upstream.
 
-## Active work
+## Trabalho ativo
 
-- **Vector Channels** — multi-agent conversation panel (`vector/` directory)
-- 10 PRs merged (PR-001 → PR-010), 14 draft PRs open (PR-011 → PR-024)
-- Desktop installer: `Hermes-0.17.0-win-x64.exe`
+- **Vector Channels** — painel de conversação multi-agente (diretório `vector/`)
+- 13 PRs merged (PR-001 → PR-013), 11 draft PRs abertos (PR-014 → PR-024)
+- Automatização: cron de 3h para PRs + cron de 12h para auto-evolução de skills
 
-## Contact
+## Contato
 
 - Gabriel Stoltemberg — [GitHub](https://github.com/stoltembergg-png)
-- Email: tutors1997@outlook.com
