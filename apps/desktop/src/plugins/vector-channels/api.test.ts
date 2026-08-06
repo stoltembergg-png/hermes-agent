@@ -12,6 +12,7 @@ import {
   getMembers,
   listAgents,
   listChannels,
+  parseApiError,
   postMessage,
   type RestFn,
 } from './api'
@@ -159,5 +160,36 @@ describe('Vector API client', () => {
     expect(result.dispatch!.entries[0].handle).toBe('gandalf')
     expect(result.messages.length).toBe(2)
     expect(result.messages[1].author_handle).toBe('gandalf')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// parseApiError tests
+// ---------------------------------------------------------------------------
+
+describe('parseApiError', () => {
+  it('extracts message from Vector error envelope', () => {
+    const e = new Error('400: {"error":{"code":"VECTOR_BAD_REQUEST","message":"Agent \'gandalf\' already exists","retryable":false}}')
+    const msg = parseApiError(e)
+    expect(msg).toContain("Agent 'gandalf' already exists")
+    expect(msg).toContain('cannot be retried')
+    expect(msg).not.toContain('{"error"')
+  })
+
+  it('does not add retry hint when retryable is true', () => {
+    const e = new Error('500: {"error":{"code":"VECTOR_INTERNAL","message":"temporary failure","retryable":true}}')
+    const msg = parseApiError(e)
+    expect(msg).toBe('temporary failure')
+  })
+
+  it('returns network error message for connection failures', () => {
+    const e = new Error('TypeError: failed to fetch')
+    const msg = parseApiError(e)
+    expect(msg).toBe('Cannot reach the Hermes backend. Is it running?')
+  })
+
+  it('returns raw message for non-Error throws', () => {
+    const msg = parseApiError('something went wrong')
+    expect(msg).toBe('something went wrong')
   })
 })

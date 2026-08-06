@@ -40,6 +40,7 @@ import {
   listAgents,
   listChannels,
   type MessageInfo,
+  parseApiError,
   type RestFn,
 } from './api'
 
@@ -228,7 +229,7 @@ function CreateChannelModal() {
       setName('')
       setSelectedAgents([])
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Failed to create channel')
+      setErr(parseApiError(e))
     } finally {
       setCreating(false)
     }
@@ -329,7 +330,7 @@ function AddAgentModal() {
       setHandle('')
       setPrompt('')
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Failed to create agent')
+      setErr(parseApiError(e))
     } finally {
       setCreating(false)
     }

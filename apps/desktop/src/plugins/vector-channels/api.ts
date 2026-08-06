@@ -93,6 +93,46 @@ export interface VectorApiError {
 }
 
 // ---------------------------------------------------------------------------
+// Error parsing — extract clean message from Vector API error envelope
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse an error thrown by the REST client into a human-readable string.
+ * Handles Vector API error envelopes ({@link VectorApiError}), network
+ * connection errors, and generic Error objects.
+ */
+export function parseApiError(e: unknown): string {
+  if (e instanceof Error) {
+    const raw = e.message
+
+    // Try to extract Vector error envelope: "400: {"error":{"code":"...","message":"...",...}}"
+    const match = raw.match(/^\d{3}:\s*(\{.*\})$/s)
+    if (match) {
+      try {
+        const parsed = JSON.parse(match[1]) as VectorApiError
+        if (parsed.error?.message) {
+          let msg = parsed.error.message
+          if (parsed.error.retryable === false) {
+            msg += '\n\nThis action cannot be retried — try a different value.'
+          }
+          return msg
+        }
+      } catch {
+        // JSON parse failed — fall through to raw message
+      }
+    }
+
+    // Network / connection errors
+    if (/failed to fetch|network|ECONNREFUSED|connect|ERR_CONNECTION/i.test(raw)) {
+      return 'Cannot reach the Hermes backend. Is it running?'
+    }
+
+    return raw
+  }
+  return String(e)
+}
+
+// ---------------------------------------------------------------------------
 // Client
 // ---------------------------------------------------------------------------
 
