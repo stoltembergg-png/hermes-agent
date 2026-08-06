@@ -84,6 +84,36 @@ export interface HealthResponse {
   storage: string
 }
 
+// ---------------------------------------------------------------------------
+// Provider/model catalog (PR-013) — mirrors GET /models in plugin_api.py,
+// which in turn mirrors the dashboard /api/model/options picker payload.
+// ---------------------------------------------------------------------------
+
+/**
+ * One provider row in the model catalog.
+ *
+ * `models` is the curated list of model IDs for that provider (the same
+ * curated list the Hermes picker uses — NOT a raw /models dump).
+ */
+export interface ModelOptionProvider {
+  slug: string
+  name: string
+  models: string[]
+}
+
+/**
+ * Response of GET /models — the Hermes provider/model catalog.
+ *
+ * `model`/`provider` (top level) are the session's current selection, kept
+ * for future UX (a "current" marker). The Add Agent modal only needs
+ * `providers` to populate its dropdowns.
+ */
+export interface ModelOptionsResponse {
+  providers: ModelOptionProvider[]
+  model: string
+  provider: string
+}
+
 export interface VectorApiError {
   error: {
     code: string
@@ -158,6 +188,18 @@ function _call<T>(path: string, opts?: { method?: string; body?: unknown }): Pro
 
 export async function getHealth(): Promise<HealthResponse> {
   return _call<HealthResponse>('/health')
+}
+
+/**
+ * Fetch the Hermes provider/model catalog (PR-013).
+ *
+ * Delegates to GET /models in plugin_api.py, which calls the Hermes model
+ * resolver (`build_model_options_payload`) — NOT the VectorService. The
+ * returned providers + their curated model lists drive the Add Agent
+ * modal's advanced provider/model dropdowns.
+ */
+export async function getModelOptions(): Promise<ModelOptionsResponse> {
+  return _call<ModelOptionsResponse>('/models')
 }
 
 export async function listAgents(): Promise<AgentInfo[]> {
