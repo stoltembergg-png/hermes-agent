@@ -113,15 +113,15 @@ function _call<T>(path: string, opts?: { method?: string; body?: unknown }): Pro
 }
 
 // ---------------------------------------------------------------------------
-// Endpoints — all prefixed with /api/vector
+// Endpoints — relative paths (ctx.rest namespaces under /api/plugins/vector-channels/)
 // ---------------------------------------------------------------------------
 
 export async function getHealth(): Promise<HealthResponse> {
-  return _call<HealthResponse>('/api/vector/health')
+  return _call<HealthResponse>('/health')
 }
 
 export async function listAgents(): Promise<AgentInfo[]> {
-  const res = await _call<AgentListResponse>('/api/vector/agents')
+  const res = await _call<AgentListResponse>('/agents')
   return res.agents
 }
 
@@ -134,28 +134,28 @@ export async function createAgent(req: {
   tools?: string[]
   fallback_models?: string[]
 }): Promise<AgentInfo> {
-  return _call<AgentInfo>('/api/vector/agents', { method: 'POST', body: req })
+  return _call<AgentInfo>('/agents', { method: 'POST', body: req })
 }
 
 export async function listChannels(): Promise<ChannelInfo[]> {
-  const res = await _call<ChannelListResponse>('/api/vector/channels')
+  const res = await _call<ChannelListResponse>('/channels')
   return res.channels
 }
 
 export async function createChannel(name: string, members: string[]): Promise<ChannelInfo> {
-  return _call<ChannelInfo>('/api/vector/channels', {
+  return _call<ChannelInfo>('/channels', {
     method: 'POST',
     body: { name, members } as CreateChannelRequest,
   })
 }
 
 export async function getMembers(channelId: string): Promise<string[]> {
-  const res = await _call<MemberListResponse>(`/api/vector/channels/${channelId}/members`)
+  const res = await _call<MemberListResponse>(`/channels/${channelId}/members`)
   return res.members
 }
 
 export async function getHistory(channelId: string, limit = 50): Promise<MessageInfo[]> {
-  const res = await _call<HistoryResponse>(`/api/vector/channels/${channelId}/messages?limit=${limit}`)
+  const res = await _call<HistoryResponse>(`/channels/${channelId}/messages?limit=${limit}`)
   return res.messages
 }
 
@@ -165,7 +165,7 @@ export async function postMessage(
   body: string,
   dispatch = true,
 ): Promise<PostMessageResponse> {
-  return _call<PostMessageResponse>(`/api/vector/channels/${channelId}/messages`, {
+  return _call<PostMessageResponse>(`/channels/${channelId}/messages`, {
     method: 'POST',
     body: {
       author_handle: authorHandle,

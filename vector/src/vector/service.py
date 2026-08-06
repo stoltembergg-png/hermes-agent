@@ -189,8 +189,11 @@ class VectorService:
         return self._store.list_channels()
 
     def create_channel(self, name: str, members: list[str]) -> Channel:
-        # Validate member handles
+        # Validate member handles — 'human' is always allowed (it's the
+        # user, not a registered agent).
         for handle in members:
+            if handle == "human":
+                continue
             try:
                 self._registry.get(handle)
             except KeyError:

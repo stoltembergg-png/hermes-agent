@@ -12,6 +12,7 @@ fake.
 
 from __future__ import annotations
 
+import json
 import time
 from dataclasses import dataclass, field
 from typing import Optional
@@ -76,6 +77,39 @@ def _is_transient(error_kind: Optional[str], exception_name: Optional[str]) -> b
 # ---------------------------------------------------------------------------
 
 
+class FakeDelegate:
+    """Default delegate — returns a placeholder when no LLM delegate is configured.
+
+    This is used when the vector API is running standalone (e.g. in the
+    desktop plugin) and the real ``delegate_task`` is not injected. It
+    allows agent registration and channel operations to succeed, while
+    agent responses clearly indicate that no LLM backend is connected.
+    """
+
+    def __call__(
+        self,
+        *,
+        goal: str | None = None,
+        context: str | None = None,
+        role: str | None = None,
+        max_iterations: int | None = None,
+        model: str | None = None,
+        provider: str | None = None,
+        tools: list[str] | None = None,
+    ) -> str:
+        return json.dumps({
+            "results": [
+                {
+                    "response": (
+                        "[vector] Agent runtime is in stub mode — no LLM delegate "
+                    "configured. Set up a model provider to get real responses."
+                    ),
+                    "status": "stub",
+                }
+            ]
+        })
+
+
 class AgentRuntime:
     """Turns an :class:`AgentProfile` into a responding agent.
 
@@ -84,6 +118,7 @@ class AgentRuntime:
     delegate
         The callable that runs the actual LLM call.  In production,
         this wraps ``delegate_task``; in tests, a ``FakeDelegate``.
+        If ``None``, a ``FakeDelegate`` is used (stub mode).
     default_model
         Model to use when ``profile.model`` is ``None`` (inherits the
         calling session's model).
@@ -93,12 +128,12 @@ class AgentRuntime:
 
     def __init__(
         self,
-        delegate: DelegateCallable,
+        delegate: DelegateCallable | None = None,
         *,
         default_model: Optional[str] = None,
         default_provider: Optional[str] = None,
     ) -> None:
-        self._delegate = delegate
+        self._delegate = delegate or FakeDelegate()
         self._default_model = default_model
         self._default_provider = default_provider
 

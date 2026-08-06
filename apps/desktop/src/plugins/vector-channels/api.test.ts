@@ -25,7 +25,7 @@ function makeMockRest(): RestFn {
     if (path.endsWith('/health')) {
       return Promise.resolve({ status: 'ok', version: '0.1.0', storage: 'sqlite' } as T)
     }
-    if (path === '/api/vector/agents') {
+    if (path === '/agents') {
       if (opts?.method === 'POST') {
         return Promise.resolve({
           handle: 'gandalf',
@@ -41,7 +41,7 @@ function makeMockRest(): RestFn {
         ],
       } as T)
     }
-    if (path === '/api/vector/channels') {
+    if (path === '/channels') {
       if (opts?.method === 'POST') {
         return Promise.resolve({ id: 'ch1', name: 'dev' } as T)
       }
@@ -114,7 +114,7 @@ describe('Vector API client', () => {
     bindApi(makeMockRest())
   })
 
-  it('getHealth calls /api/vector/health', async () => {
+  it('getHealth calls /health', async () => {
     const h = await getHealth()
     expect(h.status).toBe('ok')
     expect(h.storage).toBe('sqlite')

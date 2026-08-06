@@ -1,0 +1,8 @@
+{
+  "name": "vector-channels",
+  "label": "Vector Channels",
+  "description": "Multi-agent conversation panel — create channels, register agents, dispatch messages with @mentions",
+  "icon": "MessageSquare",
+  "version": "0.1.0",
+  "api": "plugin_api.py"
+}
