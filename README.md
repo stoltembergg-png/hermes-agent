@@ -45,6 +45,16 @@ hermes serve     # backend + API
 hermes desktop   # app desktop (Electron)
 ```
 
+<details>
+<summary>Windows (PowerShell)</summary>
+
+```powershell
+iex (irm https://hermes-agent.nousresearch.com/install.ps1)
+```
+
+Instala sob `%LOCALAPPDATA%\hermes`. Veja `scripts/install.ps1` para o script completo.
+</details>
+
 ### Variáveis necessárias
 
 ```
