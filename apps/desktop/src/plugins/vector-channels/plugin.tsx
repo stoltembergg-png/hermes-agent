@@ -29,11 +29,12 @@ import {
 import { type ChangeEvent, type KeyboardEvent, useEffect, useRef, useState } from 'react'
 
 import {
-  postMessage as apiPostMessage,
+  type AgentInfo,
   bindApi,
   type ChannelInfo,
   createAgent,
   createChannel,
+  deleteAgent,
   getHealth,
   getHistory,
   getMembers,
@@ -43,6 +44,7 @@ import {
   type MessageInfo,
   type ModelOptionProvider,
   parseApiError,
+  postMessage,
   type RestFn,
 } from './api'
 
@@ -57,6 +59,8 @@ const $messages = atom<MessageInfo[]>([])
 const $unread = atom<Record<string, number>>({})
 const $members = atom<string[]>([])
 const $agents = atom<string[]>([])
+const $agentDetails = atom<AgentInfo[]>([])
+const $selectedAgent = atom<string | null>(null)
 const $composer = atom('')
 const $autocomplete = atom<string[]>([])
 const $loading = atom(false)
@@ -365,6 +369,7 @@ function AddAgentModal() {
       await createAgent(req)
       // Refresh agents
       const agentList = await listAgents()
+      $agentDetails.set(agentList)
       $agents.set(agentList.map(a => a.handle))
       $showAddAgent.set(false)
       setHandle('')
@@ -511,10 +516,16 @@ function SidebarHeader() {
 async function refreshAgents(): Promise<void> {
   try {
     const agentList = await listAgents()
+    $agentDetails.set(agentList)
     $agents.set(agentList.map(a => a.handle))
   } catch {
     // Non-fatal
   }
+}
+
+async function deleteAgentAndRefresh(handle: string): Promise<void> {
+  await deleteAgent(handle)
+  await refreshAgents()
 }
 
 async function loadChannelData(channelId: string): Promise<void> {
@@ -540,7 +551,7 @@ async function loadChannelData(channelId: string): Promise<void> {
 async function postAndDispatch(channelId: string, body: string): Promise<void> {
   $loading.set(true)
   try {
-    const result = await apiPostMessage(channelId, 'human', body, true)
+    const result = await postMessage(channelId, 'human', body, true)
     const allMsgs = result.messages
     if (allMsgs.length > 0) {
       // Merge: dedup by message ID, preserving order
@@ -594,6 +605,152 @@ function ChannelHeader() {
 }
 
 // ---------------------------------------------------------------------------
+// PR-014: Agent list sidebar section + details panel
+// ---------------------------------------------------------------------------
+
+function agentModelLabel(agent: AgentInfo): string {
+  return agent.model ?? '--inherit--'
+}
+
+function AgentRow({ agent }: { agent: AgentInfo }) {
+  const selectedAgent = useValue($selectedAgent)
+  const isActive = selectedAgent === agent.handle
+
+  return (
+    <div
+      className={cn(
+        'vector-agent-row',
+        isActive && 'vector-agent-row-active',
+      )}
+      data-testid={`vector-agent-${agent.handle}`}
+    >
+      <button
+        className="vector-agent-row-main"
+        onClick={() => {
+          $selectedAgent.set(agent.handle)
+          // Deselect any active channel so the details panel replaces it.
+          $activeChannel.set(null)
+        }}
+        type="button"
+      >
+        <Codicon name="robot" size="0.75rem" />
+        <span className="vector-agent-handle">@{agent.handle}</span>
+        <span className="vector-agent-model">{agentModelLabel(agent)}</span>
+      </button>
+      <button
+        className="vector-agent-row-delete"
+        data-testid={`vector-agent-${agent.handle}-delete`}
+        onClick={() => void deleteAgentAndRefresh(agent.handle)}
+        title="Delete agent"
+        type="button"
+      >
+        <Codicon name="trash" size="0.75rem" />
+      </button>
+    </div>
+  )
+}
+
+function AgentDetails({ agent }: { agent: AgentInfo }) {
+  const channels = useValue($channels)
+  const loading = useValue($loading)
+  const [memberships, setMemberships] = useState<string[]>([])
+  const [deleting, setDeleting] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  // Compute channel memberships: which channels list this agent as a member.
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const result: string[] = []
+      for (const ch of channels) {
+        try {
+          const members = await getMembers(ch.id)
+          if (members.includes(agent.handle)) {
+            result.push(ch.name)
+          }
+        } catch {
+          // Non-fatal — skip this channel
+        }
+      }
+      if (!cancelled) {
+        setMemberships(result)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [agent.handle, channels])
+
+  const handleDelete = async () => {
+    setDeleting(true)
+    setErr(null)
+    try {
+      await deleteAgent(agent.handle)
+      $selectedAgent.set(null)
+      await refreshAgents()
+    } catch (e) {
+      setErr(parseApiError(e))
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const promptText = agent.description || '(not set)'
+  const modelText = agent.model ?? '--inherit--'
+  const providerText = agent.provider ?? '--inherit--'
+
+  return (
+    <div className="vector-agent-details" data-testid={`vector-agent-details-${agent.handle}`}>
+      <div className="vector-agent-details-header">
+        <h3 className="vector-agent-details-title">
+          <Codicon name="robot" size="1rem" />
+          @{agent.handle}
+        </h3>
+        <button
+          className="vector-btn-primary"
+          data-testid="vector-agent-details-delete"
+          disabled={deleting}
+          onClick={handleDelete}
+          type="button"
+        >
+          <Codicon name="trash" size="0.75rem" /> {deleting ? 'Deleting...' : 'Delete Agent'}
+        </button>
+      </div>
+      {err && <p className="vector-modal-error">{err}</p>}
+      <dl className="vector-agent-details-grid">
+        <dt>System prompt</dt>
+        <dd className="vector-agent-details-prompt">{promptText}</dd>
+        <dt>Model</dt>
+        <dd>
+          <span className="vector-agent-details-value">{modelText}</span>
+        </dd>
+        <dt>Provider</dt>
+        <dd>
+          <span className="vector-agent-details-value">{providerText}</span>
+        </dd>
+        <dt>Channel memberships</dt>
+        <dd>
+          {loading && memberships.length === 0 ? (
+            <span className="vector-agent-details-muted">Loading...</span>
+          ) : memberships.length === 0 ? (
+            <span className="vector-agent-details-muted">(none)</span>
+          ) : (
+            <ul className="vector-agent-memberships">
+              {memberships.map(name => (
+                <li className="vector-agent-membership-chip" key={name}>
+                  <Codicon name="comment-discussion" size="0.625rem" />
+                  {name}
+                </li>
+              ))}
+            </ul>
+          )}
+        </dd>
+      </dl>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Main page
 // ---------------------------------------------------------------------------
 
@@ -606,6 +763,8 @@ function ChannelsPage() {
   const showCreateChannel = useValue($showCreateChannel)
   const showAddAgent = useValue($showAddAgent)
   const agents = useValue($agents)
+  const agentDetails = useValue($agentDetails)
+  const selectedAgent = useValue($selectedAgent)
 
   const messageListRef = useRef<HTMLDivElement>(null)
 
@@ -625,6 +784,7 @@ function ChannelsPage() {
         await getHealth()
         const [chs, agentList] = await Promise.all([listChannels(), listAgents()])
         $channels.set(chs)
+        $agentDetails.set(agentList)
         $agents.set(agentList.map(a => a.handle))
       } catch {
         $error.set('Vector API not reachable. Make sure the Hermes backend is running (hermes serve or hermes dashboard).')
@@ -653,6 +813,14 @@ function ChannelsPage() {
             </button>
           </div>
         )}
+        {agentDetails.length > 0 && (
+          <div className="vector-agents-section" data-testid="vector-agents-section">
+            <div className="vector-agents-header">Agents</div>
+            {agentDetails.map(a => (
+              <AgentRow agent={a} key={a.handle} />
+            ))}
+          </div>
+        )}
       </aside>
       <main className="vector-main">
         {error ? (
@@ -669,6 +837,8 @@ function ChannelsPage() {
               </ol>
             </div>
           </div>
+        ) : selectedAgent ? (
+          <AgentDetails agent={agentDetails.find(a => a.handle === selectedAgent) ?? agentDetails[0]} />
         ) : activeChannel ? (
           <>
             <ChannelHeader />

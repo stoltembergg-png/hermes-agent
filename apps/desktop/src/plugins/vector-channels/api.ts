@@ -241,6 +241,10 @@ export async function getHistory(channelId: string, limit = 50): Promise<Message
   return res.messages
 }
 
+export async function deleteAgent(handle: string): Promise<void> {
+  await _call<{ ok: boolean }>(`/agents/${encodeURIComponent(handle)}`, { method: 'DELETE' })
+}
+
 export async function postMessage(
   channelId: string,
   authorHandle: string,
