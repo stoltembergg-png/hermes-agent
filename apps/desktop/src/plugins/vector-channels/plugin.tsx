@@ -74,10 +74,13 @@ const $showAddAgent = atom(false)
 
 function computeAutocomplete(text: string, members: string[]): string[] {
   const match = text.match(/@(\w+)$/)
+
   if (!match) {
     return []
   }
+
   const partial = match[1].toLowerCase()
+
   return members.filter(m => m.toLowerCase().startsWith(partial))
 }
 
@@ -224,8 +227,10 @@ function CreateChannelModal() {
     if (!name.trim()) {
       return
     }
+
     setCreating(true)
     setErr(null)
+
     try {
       await createChannel(name.trim(), ['human', ...selectedAgents])
       $showCreateChannel.set(false)
@@ -334,11 +339,13 @@ function AddAgentModal() {
         if (cancelled) {
           return
         }
+
         setProviders(res.providers)
       })
       .catch(() => {
         // Catalog unavailable — silently leave the dropdowns empty.
       })
+
     return () => {
       cancelled = true
     }
@@ -351,8 +358,10 @@ function AddAgentModal() {
     if (!handle.trim() || !prompt.trim()) {
       return
     }
+
     setCreating(true)
     setErr(null)
+
     try {
       // Omit model/provider when empty so the backend uses session defaults
       // (createAgent already types them as optional).
@@ -360,12 +369,15 @@ function AddAgentModal() {
         handle: handle.trim(),
         system_prompt: prompt.trim(),
       }
+
       if (provider) {
         req.provider = provider
       }
+
       if (model) {
         req.model = model
       }
+
       await createAgent(req)
       // Refresh agents
       const agentList = await listAgents()
@@ -530,16 +542,19 @@ async function deleteAgentAndRefresh(handle: string): Promise<void> {
 
 async function loadChannelData(channelId: string): Promise<void> {
   $loading.set(true)
+
   try {
     const [history, members] = await Promise.all([
       getHistory(channelId, 50),
       getMembers(channelId),
     ])
+
     $messages.set(history)
     $members.set(members)
     // Set channel name from $channels lookup
     const chs = $channels.get()
     const ch = chs.find(c => c.id === channelId)
+
     if (ch) {
       $channelName.set(ch.name)
     }
@@ -550,9 +565,11 @@ async function loadChannelData(channelId: string): Promise<void> {
 
 async function postAndDispatch(channelId: string, body: string): Promise<void> {
   $loading.set(true)
+
   try {
     const result = await postMessage(channelId, 'human', body, true)
     const allMsgs = result.messages
+
     if (allMsgs.length > 0) {
       // Merge: dedup by message ID, preserving order
       const existing = $messages.get()
@@ -562,6 +579,7 @@ async function postAndDispatch(channelId: string, body: string): Promise<void> {
     } else {
       const msgs = $messages.get()
       const ids = new Set(msgs.map(m => m.id))
+
       if (!ids.has(result.message.id)) {
         $messages.set([...msgs, result.message])
       }
@@ -660,11 +678,14 @@ function AgentDetails({ agent }: { agent: AgentInfo }) {
   // Compute channel memberships: which channels list this agent as a member.
   useEffect(() => {
     let cancelled = false
+
     void (async () => {
       const result: string[] = []
+
       for (const ch of channels) {
         try {
           const members = await getMembers(ch.id)
+
           if (members.includes(agent.handle)) {
             result.push(ch.name)
           }
@@ -672,10 +693,12 @@ function AgentDetails({ agent }: { agent: AgentInfo }) {
           // Non-fatal — skip this channel
         }
       }
+
       if (!cancelled) {
         setMemberships(result)
       }
     })()
+
     return () => {
       cancelled = true
     }
@@ -684,6 +707,7 @@ function AgentDetails({ agent }: { agent: AgentInfo }) {
   const handleDelete = async () => {
     setDeleting(true)
     setErr(null)
+
     try {
       await deleteAgent(agent.handle)
       $selectedAgent.set(null)
@@ -779,6 +803,7 @@ function ChannelsPage() {
     void (async () => {
       $loading.set(true)
       $error.set(null)
+
       try {
         // Check if the vector API is reachable
         await getHealth()
