@@ -1,4 +1,4 @@
-# Vector Agent ☤
+#                Vector Agent ☤
 
 **Multi-agent orchestration layer for [Hermes Agent](https://github.com/NousResearch/hermes-agent).**
 
