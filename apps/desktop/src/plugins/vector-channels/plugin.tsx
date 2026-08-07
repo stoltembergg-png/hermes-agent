@@ -29,9 +29,8 @@ import {
 import { type ChangeEvent, type KeyboardEvent, useEffect, useRef, useState } from 'react'
 
 import {
-  postMessage as apiPostMessage,
-  bindApi,
   type AgentInfo,
+  bindApi,
   type ChannelInfo,
   createAgent,
   createChannel,
@@ -45,6 +44,7 @@ import {
   type MessageInfo,
   type ModelOptionProvider,
   parseApiError,
+  postMessage as apiPostMessage,
   type RestFn,
 } from './api'
 
