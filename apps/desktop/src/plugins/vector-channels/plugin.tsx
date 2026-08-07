@@ -44,7 +44,7 @@ import {
   type MessageInfo,
   type ModelOptionProvider,
   parseApiError,
-  postMessage as apiPostMessage,
+  postMessage,
   type RestFn,
 } from './api'
 
@@ -551,7 +551,7 @@ async function loadChannelData(channelId: string): Promise<void> {
 async function postAndDispatch(channelId: string, body: string): Promise<void> {
   $loading.set(true)
   try {
-    const result = await apiPostMessage(channelId, 'human', body, true)
+    const result = await postMessage(channelId, 'human', body, true)
     const allMsgs = result.messages
     if (allMsgs.length > 0) {
       // Merge: dedup by message ID, preserving order
@@ -737,7 +737,7 @@ function AgentDetails({ agent }: { agent: AgentInfo }) {
           ) : (
             <ul className="vector-agent-memberships">
               {memberships.map(name => (
-                <li key={name} className="vector-agent-membership-chip">
+                <li className="vector-agent-membership-chip" key={name}>
                   <Codicon name="comment-discussion" size="0.625rem" />
                   {name}
                 </li>
