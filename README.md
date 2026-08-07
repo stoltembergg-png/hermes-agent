@@ -31,7 +31,44 @@ O core do Hermes permanece upstream-compatible. Todo o trabalho vive em `vector/
 
 ---
 
-## Setup
+## Install Vector Plugin
+
+The vector-channels plugin ships inside this repo. Install it with one command:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/stoltembergg-png/hermes-agent/main/scripts/install-vector.sh | bash
+```
+
+This auto-installs Hermes Agent, Python 3.11+, Node.js 22+, and git if missing, then installs the vector-channels plugin (backend + frontend + tests).
+
+### Updating the plugin after Hermes updates
+
+Hermes has a built-in updater (`hermes update`) that can remove the plugin. To avoid a reinstall loop, the vector plugin uses two strategies:
+
+**Option A: Hermes hooks (recommended)**
+
+Add a post-update hook that re-installs the plugin automatically:
+
+```bash
+mkdir -p ~/.hermes/hooks
+cat > ~/.hermes/hooks/post-update.sh << 'HOOK'
+#!/usr/bin/env bash
+# Re-install vector plugin after Hermes update
+bash "$(dirname "$0")/../plugins/vector-channels/install-vector.sh" 2>/dev/null || \
+  curl -fsSL https://raw.githubusercontent.com/stoltembergg-png/hermes-agent/main/scripts/install-vector.sh | bash
+HOOK
+chmod +x ~/.hermes/hooks/post-update.sh
+```
+
+**Option B: Manual re-run**
+
+After any `hermes update`, re-run:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/stoltembergg-png/hermes-agent/main/scripts/install-vector.sh | bash
+```
+
+### Development setup
 
 ```bash
 # Clone + venv + dependências
@@ -39,6 +76,9 @@ git clone https://github.com/stoltembergg-png/hermes-agent.git
 cd hermes-agent
 python3.11 -m venv venv && source venv/bin/activate
 pip install -e '.[all]'
+
+# Build web UI
+cd web && npm install && npm run build && cd ..
 
 # Rodar
 hermes serve     # backend + API
