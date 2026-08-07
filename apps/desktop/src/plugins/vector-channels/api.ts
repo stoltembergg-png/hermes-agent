@@ -109,6 +109,7 @@ function _call<T>(path: string, opts?: { method?: string; body?: unknown }): Pro
   if (!_rest) {
     return Promise.reject(new Error('Vector API client not initialized'))
   }
+
   return _rest<T>(path, opts)
 }
 
@@ -122,6 +123,7 @@ export async function getHealth(): Promise<HealthResponse> {
 
 export async function listAgents(): Promise<AgentInfo[]> {
   const res = await _call<AgentListResponse>('/agents')
+
   return res.agents
 }
 
@@ -139,6 +141,7 @@ export async function createAgent(req: {
 
 export async function listChannels(): Promise<ChannelInfo[]> {
   const res = await _call<ChannelListResponse>('/channels')
+
   return res.channels
 }
 
@@ -151,11 +154,13 @@ export async function createChannel(name: string, members: string[]): Promise<Ch
 
 export async function getMembers(channelId: string): Promise<string[]> {
   const res = await _call<MemberListResponse>(`/channels/${channelId}/members`)
+
   return res.members
 }
 
 export async function getHistory(channelId: string, limit = 50): Promise<MessageInfo[]> {
   const res = await _call<HistoryResponse>(`/channels/${channelId}/messages?limit=${limit}`)
+
   return res.messages
 }
 

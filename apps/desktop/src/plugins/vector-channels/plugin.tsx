@@ -66,10 +66,13 @@ const $showAddAgent = atom(false)
 
 function computeAutocomplete(text: string, members: string[]): string[] {
   const match = text.match(/@(\w+)$/)
+
   if (!match) {
     return []
   }
+
   const partial = match[1].toLowerCase()
+
   return members.filter(m => m.toLowerCase().startsWith(partial))
 }
 
@@ -215,8 +218,10 @@ function CreateChannelModal() {
     if (!name.trim()) {
       return
     }
+
     setCreating(true)
     setErr(null)
+
     try {
       await createChannel(name.trim(), ['human', ...selectedAgents])
       $showCreateChannel.set(false)
@@ -313,8 +318,10 @@ function AddAgentModal() {
     if (!handle.trim() || !prompt.trim()) {
       return
     }
+
     setCreating(true)
     setErr(null)
+
     try {
       await createAgent({
         handle: handle.trim(),
@@ -437,11 +444,13 @@ async function refreshAgents(): Promise<void> {
 
 async function loadChannelData(channelId: string): Promise<void> {
   $loading.set(true)
+
   try {
     const [history, members] = await Promise.all([
       getHistory(channelId, 50),
       getMembers(channelId),
     ])
+
     $messages.set(history)
     $members.set(members)
   } finally {
@@ -451,9 +460,11 @@ async function loadChannelData(channelId: string): Promise<void> {
 
 async function postAndDispatch(channelId: string, body: string): Promise<void> {
   $loading.set(true)
+
   try {
     const result = await apiPostMessage(channelId, 'human', body, true)
     const allMsgs = result.messages
+
     if (allMsgs.length > 0) {
       $messages.set(allMsgs)
     } else {
@@ -485,6 +496,7 @@ function ChannelsPage() {
     void (async () => {
       $loading.set(true)
       $error.set(null)
+
       try {
         // Check if the vector API is reachable
         await getHealth()
