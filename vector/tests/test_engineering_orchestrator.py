@@ -33,6 +33,10 @@ def test_merge_gate_blocks_pending_roles_and_ci():
 def test_manifest_can_be_promoted_only_with_evidence(tmp_path):
     manifest = build_manifest(41, "resilience", "feat/update-resilience-v2", ["scripts/install-vector.sh"])
     path = write_manifest(manifest, tmp_path)
+    stored = json.loads(path.read_text(encoding="utf-8"))
+    stored["quality_gate"]["baseline_id"] = "main:base-sha"
+    stored["quality_gate"]["baseline_score"] = 70
+    path.write_text(json.dumps(stored), encoding="utf-8")
     for role in (item["role"] for item in manifest["roles"]):
         if role in {"backend_engineer", "database_engineer"}:
             continue
@@ -95,3 +99,25 @@ def test_protected_workflow_paths_block_promotion():
     )
     assert manifest["quality_gate"]["protected_paths"] == [".github/workflows/ci.yml"]
     assert manifest["gates"]["merge_allowed"] is False
+
+
+def test_manifest_write_preserves_evidence_for_same_sha(tmp_path):
+    manifest = build_manifest(
+        4,
+        "idempotent",
+        "branch",
+        ["src/app.py"],
+        identity={"pr_head_sha": "abc123"},
+    )
+    path = write_manifest(manifest, tmp_path)
+    stored = json.loads(path.read_text(encoding="utf-8"))
+    stored["comment_actions"] = [{"comment_id": 7, "decision": "DEFER"}]
+    stored["roles"][0]["status"] = "PASS"
+    path.write_text(json.dumps(stored), encoding="utf-8")
+    refreshed = dict(manifest)
+    refreshed["title"] = "updated snapshot"
+    write_manifest(refreshed, tmp_path)
+    final = json.loads(path.read_text(encoding="utf-8"))
+    assert final["title"] == "updated snapshot"
+    assert final["comment_actions"] == [{"comment_id": 7, "decision": "DEFER"}]
+    assert final["roles"][0]["status"] == "PASS"
