@@ -183,10 +183,45 @@ class VectorService:
         self._registry.save_to_yaml(self._agents_yaml)
         return profile
 
+    def delete_agent(self, handle: str) -> None:
+        """Remove an agent profile and persist the registry to YAML.
+
+        Raises a service-level ``AgentNotFoundError`` (404) when the
+        handle is absent so the API layer can shape the error envelope;
+        the underlying AgentRegistry raises ``KeyError`` which we
+        translate.
+
+        Implements PR-016 (delete_agent backend).
+        """
+        try:
+            self._registry.delete_agent(handle)
+        except KeyError as exc:
+            raise AgentNotFoundError(
+                f"Agent '{handle}' not found"
+            ) from exc
+        # Persist the registry so the deletion survives a service restart.
+        self._registry.save_to_yaml(self._agents_yaml)
+
     # -- channels -----------------------------------------------------------
 
     def list_channels(self) -> list[Channel]:
         return self._store.list_channels()
+
+    def delete_channel(self, channel_id: str) -> None:
+        """Remove a channel and all its memberships + messages.
+
+        Raises a service-level ``ChannelNotFound`` (404) so the API layer
+        can shape the error envelope; the underlying ChannelStore raises
+        ``ChannelNotFoundError`` which we translate.
+
+        Implements PR-016 (delete_channel backend).
+        """
+        from vector.channel import ChannelNotFoundError
+
+        try:
+            self._store.delete_channel(channel_id)
+        except ChannelNotFoundError as exc:
+            raise ChannelNotFound(f"Channel '{channel_id}' not found") from exc
 
     def create_channel(self, name: str, members: list[str]) -> Channel:
         # Validate member handles — 'human' is always allowed (it's the

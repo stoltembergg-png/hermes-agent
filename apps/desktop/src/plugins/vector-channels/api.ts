@@ -84,12 +84,87 @@ export interface HealthResponse {
   storage: string
 }
 
+// ---------------------------------------------------------------------------
+// Provider/model catalog (PR-013) — mirrors GET /models in plugin_api.py,
+// which in turn mirrors the dashboard /api/model/options picker payload.
+// ---------------------------------------------------------------------------
+
+/**
+ * One provider row in the model catalog.
+ *
+ * `models` is the curated list of model IDs for that provider (the same
+ * curated list the Hermes picker uses — NOT a raw /models dump).
+ */
+export interface ModelOptionProvider {
+  slug: string
+  name: string
+  models: string[]
+}
+
+/**
+ * Response of GET /models — the Hermes provider/model catalog.
+ *
+ * `model`/`provider` (top level) are the session's current selection, kept
+ * for future UX (a "current" marker). The Add Agent modal only needs
+ * `providers` to populate its dropdowns.
+ */
+export interface ModelOptionsResponse {
+  providers: ModelOptionProvider[]
+  model: string
+  provider: string
+}
+
 export interface VectorApiError {
   error: {
     code: string
     message: string
     retryable: boolean
   }
+}
+
+// ---------------------------------------------------------------------------
+// Error parsing — extract clean message from Vector API error envelope
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse an error thrown by the REST client into a human-readable string.
+ * Handles Vector API error envelopes ({@link VectorApiError}), network
+ * connection errors, and generic Error objects.
+ */
+export function parseApiError(e: unknown): string {
+  if (e instanceof Error) {
+    const raw = e.message
+
+    // Try to extract Vector error envelope: "400: {"error":{"code":"...","message":"...",...}}"
+    const match = raw.match(/^\d{3}:\s*(\{.*\})$/s)
+
+    if (match) {
+      try {
+        const parsed = JSON.parse(match[1]) as VectorApiError
+
+        if (parsed.error?.message) {
+          let msg = parsed.error.message
+
+          if (parsed.error.retryable === false) {
+            msg += '\n\nThis action cannot be retried — try a different value.'
+          }
+
+          return msg
+        }
+      } catch {
+        // JSON parse failed — fall through to raw message
+      }
+    }
+
+    // Network / connection errors
+    if (/failed to fetch|network|ECONNREFUSED|connect|ERR_CONNECTION/i.test(raw)) {
+      return 'Cannot reach the Hermes backend. Is it running?'
+    }
+
+    return raw
+  }
+
+  return String(e)
 }
 
 // ---------------------------------------------------------------------------
@@ -119,6 +194,18 @@ function _call<T>(path: string, opts?: { method?: string; body?: unknown }): Pro
 
 export async function getHealth(): Promise<HealthResponse> {
   return _call<HealthResponse>('/health')
+}
+
+/**
+ * Fetch the Hermes provider/model catalog (PR-013).
+ *
+ * Delegates to GET /models in plugin_api.py, which calls the Hermes model
+ * resolver (`build_model_options_payload`) — NOT the VectorService. The
+ * returned providers + their curated model lists drive the Add Agent
+ * modal's advanced provider/model dropdowns.
+ */
+export async function getModelOptions(): Promise<ModelOptionsResponse> {
+  return _call<ModelOptionsResponse>('/models')
 }
 
 export async function listAgents(): Promise<AgentInfo[]> {
@@ -162,6 +249,10 @@ export async function getHistory(channelId: string, limit = 50): Promise<Message
   const res = await _call<HistoryResponse>(`/channels/${channelId}/messages?limit=${limit}`)
 
   return res.messages
+}
+
+export async function deleteAgent(handle: string): Promise<void> {
+  await _call<{ ok: boolean }>(`/agents/${encodeURIComponent(handle)}`, { method: 'DELETE' })
 }
 
 export async function postMessage(
