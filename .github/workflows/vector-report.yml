@@ -85,26 +85,26 @@ jobs:
           COMMITS="${COMMITS:-_None_}"
 
           # Vector project metrics
-          PY_FILES=$(find vector/ -name '*.py' -not -path '*/__pycache__/*' 2>/dev/null | wc -l || echo "0")
-          PY_LINES=$(find vector/ -name '*.py' -not -path '*/__pycache__/*' -exec cat {} + 2>/dev/null | wc -l || echo "0")
-          PY_TESTS=$(grep -r 'def test_' vector/tests/ --include='*.py' -l 2>/dev/null | wc -l || echo "0")
-          PY_TEST_COUNT=$(grep -r 'def test_' vector/tests/ --include='*.py' 2>/dev/null | wc -l || echo "0")
+          PY_FILES=$(find vector/ -name '*.py' -not -path '*/__pycache__/*' 2>/dev/null | wc -l || true)
+          PY_LINES=$(find vector/ -name '*.py' -not -path '*/__pycache__/*' -exec cat {} + 2>/dev/null | wc -l || true)
+          PY_TESTS=$(grep -r 'def test_' vector/tests/ --include='*.py' -l 2>/dev/null | wc -l || true)
+          PY_TEST_COUNT=$(grep -r 'def test_' vector/tests/ --include='*.py' 2>/dev/null | wc -l || true)
 
           # Desktop plugin metrics
-          TSX_FILES=$(find apps/desktop/src/plugins/vector-channels -name '*.tsx' -o -name '*.ts' 2>/dev/null | wc -l || echo "0")
-          TSX_LINES=$(find apps/desktop/src/plugins/vector-channels -name '*.tsx' -o -name '*.ts' -exec cat {} + 2>/dev/null | wc -l || echo "0")
-          CSS_LINES=$(find apps/desktop/src/plugins/vector-channels -name '*.css' -exec cat {} + 2>/dev/null | wc -l || echo "0")
+          TSX_FILES=$(find apps/desktop/src/plugins/vector-channels -name '*.tsx' -o -name '*.ts' 2>/dev/null | wc -l || true)
+          TSX_LINES=$(find apps/desktop/src/plugins/vector-channels -name '*.tsx' -o -name '*.ts' -exec cat {} + 2>/dev/null | wc -l || true)
+          CSS_LINES=$(find apps/desktop/src/plugins/vector-channels -name '*.css' -exec cat {} + 2>/dev/null | wc -l || true)
 
           # Backend plugin metrics
-          PY_PLUGIN_FILES=$(find plugins/vector-channels -name '*.py' 2>/dev/null | wc -l || echo "0")
-          PY_PLUGIN_LINES=$(find plugins/vector-channels -name '*.py' -exec cat {} + 2>/dev/null | wc -l || echo "0")
+          PY_PLUGIN_FILES=$(find plugins/vector-channels -name '*.py' 2>/dev/null | wc -l || true)
+          PY_PLUGIN_LINES=$(find plugins/vector-channels -name '*.py' -exec cat {} + 2>/dev/null | wc -l || true)
 
           # Spec features
-          SPEC_FEATURES=$(ls -d .spec/features/*/ 2>/dev/null | wc -l || echo "0")
-          SPEC_EVIDENCE=$(ls .spec/verification/*.json 2>/dev/null | wc -l || echo "0")
+          SPEC_FEATURES=$(ls -d .spec/features/*/ 2>/dev/null | wc -l || true)
+          SPEC_EVIDENCE=$(ls .spec/verification/*.json 2>/dev/null | wc -l || true)
 
           # Roadmap specs
-          ROADMAP_PRS=$(ls docs/roadmap/prs/PR-*.md 2>/dev/null | wc -l || echo "0")
+          ROADMAP_PRS=$(ls docs/roadmap/prs/PR-*.md 2>/dev/null | wc -l || true)
 
           # Open issues
           OPEN_ISSUES=$(gh issue list --state open --limit 20 \
@@ -119,10 +119,10 @@ jobs:
           LATEST_RELEASE="${LATEST_RELEASE:-_None_}"
 
           # Skills installed
-          SKILLS_COUNT=$(find ~/.hermes/skills -name "SKILL.md" -type f 2>/dev/null | wc -l || echo "0")
+          SKILLS_COUNT=$(find ~/.hermes/skills -name "SKILL.md" -type f 2>/dev/null | wc -l || true)
 
           # Cron jobs active (from config)
-          CRON_JOBS=$(grep -r "schedule:" ~/.hermes/cron/ 2>/dev/null | wc -l || echo "0")
+          CRON_JOBS=$(grep -r "schedule:" ~/.hermes/cron/ 2>/dev/null | wc -l || true)
 
           {
             echo "REPORT_DATE=$REPORT_DATE"
