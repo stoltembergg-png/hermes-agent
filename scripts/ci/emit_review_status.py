@@ -16,7 +16,7 @@ Builds a JSON array with one entry::
 
 The ``source`` field is the workflow name that declared the status; the
 assembler uses it to exclude the corresponding job from the synthesized
-❌ Error list (the job already has its own status section).
+error list (the job already has its own status section).
 
 The array can contain 0 to 3 results — one per lane that ran
 (``ci_review``, ``mcp_catalog``, ``supply_chain``). When the ``ci-reviewed`` label is

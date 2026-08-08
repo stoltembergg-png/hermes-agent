@@ -36,7 +36,7 @@ Each result object has:
 
 The assembler flattens all results into a flat list of ReviewItems,
 grouped by severity in the comment. Jobs that failed (from the
-``needs`` context) but didn't emit any status get synthesized ❌ Error
+``needs`` context) but didn't emit any status get synthesized error
 items. Jobs that DID emit a status are excluded from the synthesized
 error list — their own output is the authority for their classification.
 
@@ -59,14 +59,14 @@ MARKER = "<!-- hermes-ci-review-bot -->"
 _SEVERITY_ORDER = ["error", "action_required", "warning", "info", "debug"]
 
 # Severities that trigger the "blocking issues" layout (vs. the
-# "looks good!" banner).
+# "all clear" banner).
 _BLOCKING_SEVERITIES = ("error", "action_required", "warning")
 
 _SEVERITY_GROUP_HEADER = {
-    "error": "## ❌ Job failures",
-    "action_required": "## ⚠️ Action required",
-    "warning": "## ⚠️ Warnings",
-    "info": "## ℹ️ Details",
+    "error": "## FAILURES",
+    "action_required": "## ACTION REQUIRED",
+    "warning": "## WARNINGS",
+    "info": "## DETAILS",
 }
 
 
@@ -100,7 +100,7 @@ def collect_from_statuses(review_statuses_json: str) -> tuple[list[ReviewItem], 
     Returns ``(items, sources)`` where ``sources`` is the set of source
     values — used by :func:`collect_failed_jobs` to exclude jobs that
     already declared their own status (so a failing job that emitted an
-    ``action_required`` status doesn't also show as a synthesized ❌ Error).
+    ``action_required`` status doesn't also show as a synthesized error).
     """
     if not review_statuses_json:
         return [], set()
@@ -158,7 +158,7 @@ def collect_failed_jobs(
     own status output.
 
     ``job_urls`` is an optional ``{job_name: html_url}`` dict from the
-    live poller. When a job's name is in this dict, the ❌ Error link
+    live poller. When a job's name is in this dict, the error link
     points directly to that job's logs page instead of the whole run.
     Falls back to ``run_url`` when no per-job URL is available.
     """
@@ -201,8 +201,8 @@ def collect_failed_jobs(
 def _render_item(item: ReviewItem) -> str:
     """Render a single ReviewItem as a markdown block.
 
-    The group header (``## ❌ Job failures`` etc.) carries the severity
-    emoji, so items don't repeat it. Links are shown inline next to the
+    The group header (``## FAILURES`` etc.) carries the severity
+    label, so items don't repeat it. Links are shown inline next to the
     title. Layout per item::
 
         ### {title} · [View report](url) · [View job](url)
@@ -249,13 +249,47 @@ def _render_debug_details(items: list[ReviewItem]) -> str:
         blocks.append(
             f"<details>\n<summary>{item.title}</summary>\n\n{inner}\n\n</details>"
         )
-    return "### debug info\n\n" + "\n\n".join(blocks)
+    return "### Debug\n\n" + "\n\n".join(blocks)
 
 
 def _render_pending_items(pending_jobs: list[str]) -> str:
     """Render the dimmed ``<sub>`` items for jobs still running."""
     job_list = ", ".join(f"`{j}`" for j in sorted(pending_jobs))
     return f"\n\n---\n\n<sub>Still running {len(pending_jobs)} job{'s' if len(pending_jobs) != 1 else ''}: {job_list}</sub>\n"
+
+
+def _render_summary_table(items: list[ReviewItem], pending: list[str]) -> str:
+    """Render a compact summary table: counts by status.
+
+    Provides at-a-glance actionable info instead of a decorative header.
+    """
+    by_sev: dict[str, int] = {s: 0 for s in _SEVERITY_ORDER}
+    for item in items:
+        by_sev.setdefault(item.severity, 0)
+        by_sev[item.severity] += 1
+
+    failures = by_sev["error"]
+    actions = by_sev["action_required"]
+    warnings = by_sev["warning"]
+    n_pending = len(pending)
+
+    if failures:
+        status = "FAILING"
+    elif actions:
+        status = "ACTION REQUIRED"
+    elif warnings:
+        status = "WARNINGS"
+    elif n_pending:
+        status = "RUNNING"
+    else:
+        status = "PASSING"
+
+    rows = [
+        "| Status | Failures | Action required | Warnings | Pending |",
+        "|--------|----------|------------------|----------|---------|",
+        f"| {status} | {failures} | {actions} | {warnings} | {n_pending} |",
+    ]
+    return "\n".join(rows) + "\n"
 
 
 def render_comment(items: list[ReviewItem], pending_jobs: list[str] | None = None, commit_info: str = "") -> str:
@@ -267,9 +301,8 @@ def render_comment(items: list[ReviewItem], pending_jobs: list[str] | None = Non
     are in a collapsible ``<details>`` block. If ``pending_jobs`` is non-empty, a dimmed
     ``<sub>`` footer is appended listing jobs still running.
 
-    When there are no errors, action_required, or warnings, an "all good!"
-    banner is shown at the top. Info items remain visible and debug items
-    follow in collapsible ``<details>`` blocks.
+    A summary table at the top shows counts by status followed by the
+    severity-grouped sections below.
     """
     pending = pending_jobs or []
 
@@ -282,13 +315,17 @@ def render_comment(items: list[ReviewItem], pending_jobs: list[str] | None = Non
     debug = by_severity.get("debug", [])
     has_blocking = any(by_severity.get(s) for s in _BLOCKING_SEVERITIES)
 
-    body = f"{MARKER}\n# ૮ >ﻌ< ა ci review\n\n"
+    body = f"{MARKER}\n## CI Review\n\n"
 
     if commit_info:
         body += f"{commit_info}\n\n"
 
     if not items and not pending:
-        return f"{body}all good!"
+        return f"{body}All checks passed."
+
+    # Summary table at the top
+    body += _render_summary_table(items, pending)
+    body += "\n"
 
     sections: list[str] = []
 
@@ -298,7 +335,7 @@ def render_comment(items: list[ReviewItem], pending_jobs: list[str] | None = Non
             sections.append(_render_group(_SEVERITY_GROUP_HEADER[sev], group))
 
     if info:
-        sections.append(_render_group("## ℹ️ Info", info))
+        sections.append(_render_group("## DETAILS", info))
 
     # Debug: collapsible <details>
     if debug:
@@ -308,7 +345,7 @@ def render_comment(items: list[ReviewItem], pending_jobs: list[str] | None = Non
         body += _render_pending_items(pending)
 
     if sections:
-        body += "\n\n---\n\n".join(sections)
+        body += "\n\n---\n\n" + "\n\n---\n\n".join(sections)
 
     return body
 

@@ -26,20 +26,25 @@ import {
   STATUSBAR_AREAS,
   useValue,
 } from '@hermes/plugin-sdk'
-import { type ChangeEvent, type KeyboardEvent, useEffect, useState } from 'react'
+import { type ChangeEvent, type KeyboardEvent, useEffect, useRef, useState } from 'react'
 
 import {
-  postMessage as apiPostMessage,
+  type AgentInfo,
   bindApi,
   type ChannelInfo,
   createAgent,
   createChannel,
+  deleteAgent,
   getHealth,
   getHistory,
   getMembers,
+  getModelOptions,
   listAgents,
   listChannels,
   type MessageInfo,
+  type ModelOptionProvider,
+  parseApiError,
+  postMessage,
   type RestFn,
 } from './api'
 
@@ -49,10 +54,13 @@ import {
 
 const $channels = atom<ChannelInfo[]>([])
 const $activeChannel = atom<string | null>(null)
+const $channelName = atom<string | null>(null)
 const $messages = atom<MessageInfo[]>([])
 const $unread = atom<Record<string, number>>({})
 const $members = atom<string[]>([])
 const $agents = atom<string[]>([])
+const $agentDetails = atom<AgentInfo[]>([])
+const $selectedAgent = atom<string | null>(null)
 const $composer = atom('')
 const $autocomplete = atom<string[]>([])
 const $loading = atom(false)
@@ -117,6 +125,7 @@ function ChannelRow({ channel }: { channel: ChannelInfo }) {
       data-testid={`vector-channel-${channel.name}`}
       onClick={() => {
         $activeChannel.set(channel.id)
+        $channelName.set(channel.name)
         markRead(channel.id)
         void loadChannelData(channel.id)
       }}
@@ -125,6 +134,11 @@ function ChannelRow({ channel }: { channel: ChannelInfo }) {
       <span className="flex items-center gap-1.5">
         <Codicon name="comment-discussion" size="0.75rem" />
         <span>{channel.name}</span>
+        {channel.member_count && channel.member_count > 0 && (
+          <span className="vector-channel-badge" data-testid={`vector-channel-badge-${channel.name}`}>
+            {channel.member_count}
+          </span>
+        )}
       </span>
       {count > 0 && (
         <span className="rounded-full bg-(--ui-accent) px-1.5 text-[0.625rem] tabular-nums text-white">
@@ -136,11 +150,22 @@ function ChannelRow({ channel }: { channel: ChannelInfo }) {
 }
 
 function MessageRow({ msg }: { msg: MessageInfo }) {
+  const initial = msg.author_handle.charAt(0).toUpperCase()
+
   return (
-    <div className="message-row" data-testid={`vector-message-${msg.author_handle}`}>
-      <span className="message-author">@{msg.author_handle}</span>
-      <span className="message-time">{new Date(msg.created_at).toLocaleTimeString()}</span>
-      <p className="message-body">{msg.body}</p>
+    <div className="vector-message-row" data-testid={`vector-message-${msg.author_handle}`}>
+      <div className="vector-message-avatar" data-testid={`vector-message-avatar-${msg.author_handle}`}>
+        {initial}
+      </div>
+      <div className="vector-message-content">
+        <div className="vector-message-header">
+          <span className="vector-message-author">@{msg.author_handle}</span>
+          <span className="vector-message-time" data-testid={`vector-message-time-${msg.author_handle}`}>
+            {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </span>
+        </div>
+        <p className="vector-message-body">{msg.body}</p>
+      </div>
     </div>
   )
 }
@@ -231,7 +256,7 @@ function CreateChannelModal() {
       setName('')
       setSelectedAgents([])
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Failed to create channel')
+      setErr(parseApiError(e))
     } finally {
       setCreating(false)
     }
@@ -313,6 +338,37 @@ function AddAgentModal() {
   const [prompt, setPrompt] = useState('')
   const [creating, setCreating] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  // PR-013: provider/model picker state. Empty string === "inherit
+  // session defaults" (omitted from the createAgent request entirely).
+  const [providers, setProviders] = useState<ModelOptionProvider[]>([])
+  const [provider, setProvider] = useState('')
+  const [model, setModel] = useState('')
+
+  // Fetch the Hermes model catalog once on modal mount so the Advanced
+  // dropdowns are populated. A fetch failure is non-fatal — the user can
+  // still create an agent with session-inherited defaults (both selects
+  // just stay empty).
+  useEffect(() => {
+    let cancelled = false
+    void getModelOptions()
+      .then(res => {
+        if (cancelled) {
+          return
+        }
+
+        setProviders(res.providers)
+      })
+      .catch(() => {
+        // Catalog unavailable — silently leave the dropdowns empty.
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // Models for the currently-selected provider (empty until one is picked).
+  const modelOptions = providers.find(p => p.slug === provider)?.models ?? []
 
   const handleCreate = async () => {
     if (!handle.trim() || !prompt.trim()) {
@@ -323,18 +379,33 @@ function AddAgentModal() {
     setErr(null)
 
     try {
-      await createAgent({
+      // Omit model/provider when empty so the backend uses session defaults
+      // (createAgent already types them as optional).
+      const req: Parameters<typeof createAgent>[0] = {
         handle: handle.trim(),
         system_prompt: prompt.trim(),
-      })
+      }
+
+      if (provider) {
+        req.provider = provider
+      }
+
+      if (model) {
+        req.model = model
+      }
+
+      await createAgent(req)
       // Refresh agents
       const agentList = await listAgents()
+      $agentDetails.set(agentList)
       $agents.set(agentList.map(a => a.handle))
       $showAddAgent.set(false)
       setHandle('')
       setPrompt('')
+      setProvider('')
+      setModel('')
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Failed to create agent')
+      setErr(parseApiError(e))
     } finally {
       setCreating(false)
     }
@@ -371,6 +442,43 @@ function AddAgentModal() {
               value={prompt}
             />
           </label>
+          <details className="vector-modal-details" data-testid="vector-add-agent-advanced">
+            <summary>Advanced</summary>
+            <label className="vector-modal-label">
+              Provider
+              <select
+                className="vector-modal-input"
+                data-testid="vector-add-agent-provider"
+                onChange={e => {
+                  setProvider(e.target.value)
+                  // Reset model when the provider changes so we never submit a
+                  // stale model that doesn't belong to the new provider.
+                  setModel('')
+                }}
+                value={provider}
+              >
+                <option value="">Inherit from session</option>
+                {providers.map(p => (
+                  <option key={p.slug} value={p.slug}>{p.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="vector-modal-label">
+              Model
+              <select
+                className="vector-modal-input"
+                data-testid="vector-add-agent-model"
+                disabled={!provider}
+                onChange={e => setModel(e.target.value)}
+                value={model}
+              >
+                <option value="">Inherit</option>
+                {modelOptions.map(m => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            </label>
+          </details>
           {err && <p className="vector-modal-error">{err}</p>}
         </div>
         <div className="vector-modal-footer">
@@ -401,25 +509,25 @@ function SidebarHeader() {
       <h2 className="sidebar-title">Channels</h2>
       <div className="vector-sidebar-actions">
         <button
-          className="vector-icon-btn"
+          className="vector-sidebar-btn"
           onClick={() => void refreshAgents()}
-          title="Add Agent"
+          title="Refresh agents"
           type="button"
         >
-          <Codicon name="robot" size="0.875rem" />
+          <Codicon name="sync" size="0.875rem" />
         </button>
         <button
-          className="vector-icon-btn"
+          className="vector-sidebar-btn"
           onClick={() => $showAddAgent.set(true)}
-          title="Add Agent"
+          title="Add agent"
           type="button"
         >
-          <Codicon name="add" size="0.875rem" />
+          <Codicon name="new-file" size="0.875rem" />
         </button>
         <button
-          className="vector-icon-btn"
+          className="vector-sidebar-btn"
           onClick={() => $showCreateChannel.set(true)}
-          title="Create Channel"
+          title="Create channel"
           type="button"
         >
           <Codicon name="add" size="0.875rem" />
@@ -436,10 +544,16 @@ function SidebarHeader() {
 async function refreshAgents(): Promise<void> {
   try {
     const agentList = await listAgents()
+    $agentDetails.set(agentList)
     $agents.set(agentList.map(a => a.handle))
   } catch {
     // Non-fatal
   }
+}
+
+async function deleteAgentAndRefresh(handle: string): Promise<void> {
+  await deleteAgent(handle)
+  await refreshAgents()
 }
 
 async function loadChannelData(channelId: string): Promise<void> {
@@ -453,6 +567,13 @@ async function loadChannelData(channelId: string): Promise<void> {
 
     $messages.set(history)
     $members.set(members)
+    // Set channel name from $channels lookup
+    const chs = $channels.get()
+    const ch = chs.find(c => c.id === channelId)
+
+    if (ch) {
+      $channelName.set(ch.name)
+    }
   } finally {
     $loading.set(false)
   }
@@ -462,20 +583,211 @@ async function postAndDispatch(channelId: string, body: string): Promise<void> {
   $loading.set(true)
 
   try {
-    const result = await apiPostMessage(channelId, 'human', body, true)
+    const result = await postMessage(channelId, 'human', body, true)
     const allMsgs = result.messages
 
     if (allMsgs.length > 0) {
-      $messages.set(allMsgs)
+      // Merge: dedup by message ID, preserving order
+      const existing = $messages.get()
+      const ids = new Set(existing.map(m => m.id))
+      const newMsgs = allMsgs.filter(m => !ids.has(m.id))
+      $messages.set([...existing, ...newMsgs])
     } else {
       const msgs = $messages.get()
-      $messages.set([...msgs, result.message])
+      const ids = new Set(msgs.map(m => m.id))
+
+      if (!ids.has(result.message.id)) {
+        $messages.set([...msgs, result.message])
+      }
     }
   } catch {
     // Error state — non-fatal, preserves existing messages
   } finally {
     $loading.set(false)
   }
+}
+
+// ---------------------------------------------------------------------------
+// Channel header — shows channel name + member chips
+// ---------------------------------------------------------------------------
+
+function ChannelHeader() {
+  const channelName = useValue($channelName)
+  const members = useValue($members)
+
+  if (!channelName) {
+    return null
+  }
+
+  return (
+    <div className="vector-channel-header" data-testid="vector-channel-header">
+      <h3 className="vector-channel-name">
+        <Codicon name="comment-discussion" size="0.875rem" />
+        {channelName}
+      </h3>
+      <div className="vector-channel-members">
+        <span className="vector-member-count">{members.length} members</span>
+        {members.map(m => (
+          <span className="vector-member-chip" key={m}>
+            <Codicon name={m === 'human' ? 'account' : 'robot'} size="0.625rem" />
+            @{m}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// PR-014: Agent list sidebar section + details panel
+// ---------------------------------------------------------------------------
+
+function agentModelLabel(agent: AgentInfo): string {
+  return agent.model ?? '--inherit--'
+}
+
+function AgentRow({ agent }: { agent: AgentInfo }) {
+  const selectedAgent = useValue($selectedAgent)
+  const isActive = selectedAgent === agent.handle
+
+  return (
+    <div
+      className={cn(
+        'vector-agent-row',
+        isActive && 'vector-agent-row-active',
+      )}
+      data-testid={`vector-agent-${agent.handle}`}
+    >
+      <button
+        className="vector-agent-row-main"
+        onClick={() => {
+          $selectedAgent.set(agent.handle)
+          // Deselect any active channel so the details panel replaces it.
+          $activeChannel.set(null)
+        }}
+        type="button"
+      >
+        <Codicon name="robot" size="0.75rem" />
+        <span className="vector-agent-handle">@{agent.handle}</span>
+        <span className="vector-agent-model">{agentModelLabel(agent)}</span>
+      </button>
+      <button
+        className="vector-agent-row-delete"
+        data-testid={`vector-agent-${agent.handle}-delete`}
+        onClick={() => void deleteAgentAndRefresh(agent.handle)}
+        title="Delete agent"
+        type="button"
+      >
+        <Codicon name="trash" size="0.75rem" />
+      </button>
+    </div>
+  )
+}
+
+function AgentDetails({ agent }: { agent: AgentInfo }) {
+  const channels = useValue($channels)
+  const loading = useValue($loading)
+  const [memberships, setMemberships] = useState<string[]>([])
+  const [deleting, setDeleting] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  // Compute channel memberships: which channels list this agent as a member.
+  useEffect(() => {
+    let cancelled = false
+
+    void (async () => {
+      const result: string[] = []
+
+      for (const ch of channels) {
+        try {
+          const members = await getMembers(ch.id)
+
+          if (members.includes(agent.handle)) {
+            result.push(ch.name)
+          }
+        } catch {
+          // Non-fatal — skip this channel
+        }
+      }
+
+      if (!cancelled) {
+        setMemberships(result)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [agent.handle, channels])
+
+  const handleDelete = async () => {
+    setDeleting(true)
+    setErr(null)
+
+    try {
+      await deleteAgent(agent.handle)
+      $selectedAgent.set(null)
+      await refreshAgents()
+    } catch (e) {
+      setErr(parseApiError(e))
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const promptText = agent.description || '(not set)'
+  const modelText = agent.model ?? '--inherit--'
+  const providerText = agent.provider ?? '--inherit--'
+
+  return (
+    <div className="vector-agent-details" data-testid={`vector-agent-details-${agent.handle}`}>
+      <div className="vector-agent-details-header">
+        <h3 className="vector-agent-details-title">
+          <Codicon name="robot" size="1rem" />
+          @{agent.handle}
+        </h3>
+        <button
+          className="vector-btn-primary"
+          data-testid="vector-agent-details-delete"
+          disabled={deleting}
+          onClick={handleDelete}
+          type="button"
+        >
+          <Codicon name="trash" size="0.75rem" /> {deleting ? 'Deleting...' : 'Delete Agent'}
+        </button>
+      </div>
+      {err && <p className="vector-modal-error">{err}</p>}
+      <dl className="vector-agent-details-grid">
+        <dt>System prompt</dt>
+        <dd className="vector-agent-details-prompt">{promptText}</dd>
+        <dt>Model</dt>
+        <dd>
+          <span className="vector-agent-details-value">{modelText}</span>
+        </dd>
+        <dt>Provider</dt>
+        <dd>
+          <span className="vector-agent-details-value">{providerText}</span>
+        </dd>
+        <dt>Channel memberships</dt>
+        <dd>
+          {loading && memberships.length === 0 ? (
+            <span className="vector-agent-details-muted">Loading...</span>
+          ) : memberships.length === 0 ? (
+            <span className="vector-agent-details-muted">(none)</span>
+          ) : (
+            <ul className="vector-agent-memberships">
+              {memberships.map(name => (
+                <li className="vector-agent-membership-chip" key={name}>
+                  <Codicon name="comment-discussion" size="0.625rem" />
+                  {name}
+                </li>
+              ))}
+            </ul>
+          )}
+        </dd>
+      </dl>
+    </div>
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -491,6 +803,17 @@ function ChannelsPage() {
   const showCreateChannel = useValue($showCreateChannel)
   const showAddAgent = useValue($showAddAgent)
   const agents = useValue($agents)
+  const agentDetails = useValue($agentDetails)
+  const selectedAgent = useValue($selectedAgent)
+
+  const messageListRef = useRef<HTMLDivElement>(null)
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    if (messageListRef.current) {
+      messageListRef.current.scrollTop = messageListRef.current.scrollHeight
+    }
+  }, [messages])
 
   useEffect(() => {
     void (async () => {
@@ -502,6 +825,7 @@ function ChannelsPage() {
         await getHealth()
         const [chs, agentList] = await Promise.all([listChannels(), listAgents()])
         $channels.set(chs)
+        $agentDetails.set(agentList)
         $agents.set(agentList.map(a => a.handle))
       } catch {
         $error.set('Vector API not reachable. Make sure the Hermes backend is running (hermes serve or hermes dashboard).')
@@ -530,6 +854,14 @@ function ChannelsPage() {
             </button>
           </div>
         )}
+        {agentDetails.length > 0 && (
+          <div className="vector-agents-section" data-testid="vector-agents-section">
+            <div className="vector-agents-header">Agents</div>
+            {agentDetails.map(a => (
+              <AgentRow agent={a} key={a.handle} />
+            ))}
+          </div>
+        )}
       </aside>
       <main className="vector-main">
         {error ? (
@@ -546,9 +878,19 @@ function ChannelsPage() {
               </ol>
             </div>
           </div>
+        ) : selectedAgent ? (
+          <AgentDetails agent={agentDetails.find(a => a.handle === selectedAgent) ?? agentDetails[0]} />
         ) : activeChannel ? (
           <>
-            <div className="message-list" data-testid="vector-message-list">
+            <ChannelHeader />
+            <div className="message-list" data-testid="vector-message-list" ref={messageListRef}>
+              {messages.length === 0 && !loading && (
+                <div className="vector-no-messages" data-testid="vector-no-messages">
+                  <Codicon name="comment-discussion" size="1.5rem" />
+                  <p>No messages yet.</p>
+                  <p className="vector-hint">Start chatting below — use @handle to mention agents</p>
+                </div>
+              )}
               {messages.map(msg => (
                 <MessageRow key={msg.id} msg={msg} />
               ))}
