@@ -28,7 +28,7 @@ STAGES = ["diagnose", "implement", "lint_test", "merge", "fix_ci", "learn"]
 def load_state():
     STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
     if STATE_FILE.exists():
-        return json.loads(STATE_FILE.read_text())
+        return json.loads(STATE_FILE.read_text(encoding="utf-8"))
     return {"last_stage": None, "last_run": None, "cycle": 0, "history": []}
 
 
@@ -40,7 +40,7 @@ def save_state(state):
     })
     if len(state["history"]) > 50:
         state["history"] = state["history"][-50:]
-    STATE_FILE.write_text(json.dumps(state, indent=2))
+    STATE_FILE.write_text(json.dumps(state, indent=2), encoding="utf-8")
 
 
 def next_stage(state):
@@ -68,7 +68,7 @@ def run_cmd(cmd, timeout=30):
         env["GITHUB_TOKEN"] = token
     env["PATH"] = f"/home/ec2-user/.local/bin:/usr/local/bin:/usr/bin:/bin:{env.get('PATH', '')}"
     try:
-        r = subprocess.run(cmd, shell=True, capture_output=True, text=True,
+        r = subprocess.run(cmd, shell=True, capture_output=True, text=True, encoding="utf-8", errors="replace",
                          timeout=timeout, cwd=REPO, env=env)
         # Strip ANSI escape codes from stdout
         import re
