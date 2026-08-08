@@ -31,69 +31,53 @@ O core do Hermes permanece upstream-compatible. Todo o trabalho vive em `vector/
 
 ---
 
-## Install Vector Plugin
+## Instalação universal
 
-The vector-channels plugin ships inside this repo. Install it with one command:
+O Vector possui um único instalador multiplataforma. O mesmo comando funciona em
+Linux, macOS, Windows, PowerShell, CMD e WSL, desde que Python 3 esteja disponível:
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/stoltembergg-png/hermes-agent/main/scripts/install-vector.sh | bash
+```text
+python -c "import urllib.request; exec(compile(urllib.request.urlopen('https://raw.githubusercontent.com/stoltembergg-png/hermes-agent/main/scripts/install-vector.py').read(), 'install-vector.py', 'exec'))"
 ```
 
-This auto-installs Hermes Agent, Python 3.11+, Node.js 22+, and git if missing, then installs the vector-channels plugin (backend + frontend + tests).
+O instalador detecta o sistema operacional e:
 
-### Updating the plugin after Hermes updates
+- usa o instalador nativo do Hermes quando o CLI ainda não existe;
+- instala o backend e o pacote Vector em `HERMES_HOME`;
+- compila o plugin desktop quando Node.js 22+ está disponível;
+- habilita `vector-channels`;
+- instala o hook de atualização automaticamente;
+- não exige comandos adicionais de `git`, `pip`, `npm` ou `curl`.
 
-Hermes has a built-in updater (`hermes update`) that can remove the plugin. To avoid a reinstall loop, the vector plugin uses two strategies:
+Para validar sem alterar o sistema:
 
-**Option A: Hermes hooks (recommended)**
-
-Add a post-update hook that re-installs the plugin automatically:
-
-```bash
-mkdir -p ~/.hermes/hooks
-cat > ~/.hermes/hooks/post-update.sh << 'HOOK'
-#!/usr/bin/env bash
-# Re-install vector plugin after Hermes update
-bash "$(dirname "$0")/../plugins/vector-channels/install-vector.sh" 2>/dev/null || \
-  curl -fsSL https://raw.githubusercontent.com/stoltembergg-png/hermes-agent/main/scripts/install-vector.sh | bash
-HOOK
-chmod +x ~/.hermes/hooks/post-update.sh
+```text
+python -c "import urllib.request; exec(compile(urllib.request.urlopen('https://raw.githubusercontent.com/stoltembergg-png/hermes-agent/main/scripts/install-vector.py').read(), 'install-vector.py', 'exec'))" --dry-run
 ```
 
-**Option B: Manual re-run**
+O wrapper nativo do Windows também está disponível em `scripts/install-vector.ps1`
+(e `scripts/install-vector.cmd` para CMD), mas ambos executam a mesma implementação.
+Quando o Hermes ainda não está instalado, o bootstrap delega ao instalador nativo
+`scripts/install.ps1`.
 
-After any `hermes update`, re-run:
+O instalador também pode ser executado a partir de um checkout local:
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/stoltembergg-png/hermes-agent/main/scripts/install-vector.sh | bash
+```text
+python scripts/install-vector.py --source .
 ```
 
-### Development setup
+Após a instalação, reinicie o Hermes. O hook instalado reexecuta o mesmo
+instalador automaticamente quando `hermes update` remover ou substituir o plugin.
 
-```bash
-# Clone + venv + dependências
+### Desenvolvimento
+
+A instalação de desenvolvimento é deliberadamente separada da instalação de usuário:
+
+```text
 git clone https://github.com/stoltembergg-png/hermes-agent.git
 cd hermes-agent
-python3.11 -m venv venv && source venv/bin/activate
-pip install -e '.[all]'
-
-# Build web UI
-cd web && npm install && npm run build && cd ..
-
-# Rodar
-hermes serve     # backend + API
-hermes desktop   # app desktop (Electron)
+uv sync --all-extras
 ```
-
-<details>
-<summary>Windows (PowerShell)</summary>
-
-```powershell
-iex (irm https://hermes-agent.nousresearch.com/install.ps1)
-```
-
-Instala sob `%LOCALAPPDATA%\hermes`. Veja `scripts/install.ps1` para o script completo.
-</details>
 
 ### Variáveis necessárias
 
