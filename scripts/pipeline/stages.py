@@ -20,9 +20,23 @@ import sys
 import time
 from pathlib import Path
 
-REPO = "/home/ec2-user/hermes-agent"
-STATE_FILE = Path("/home/ec2-user/.hermes/pipeline/state.json")
-STAGES = ["diagnose", "implement", "lint_test", "merge", "fix_ci", "learn"]
+from orchestrator import build_manifest, merge_gate, update_gates, update_role, write_manifest
+
+REPO = os.environ.get("VECTOR_REPO", str(Path(__file__).resolve().parents[2]))
+STATE_FILE = Path(os.environ.get("VECTOR_PIPELINE_STATE", "/home/ec2-user/.hermes/pipeline/state.json"))
+MANIFEST_DIR = Path(os.environ.get("VECTOR_PIPELINE_MANIFESTS", "/home/ec2-user/.hermes/pipeline/manifests"))
+STAGES = [
+    "diagnose",
+    "orchestrate",
+    "implement",
+    "lint_test",
+    "security_review",
+    "code_review",
+    "release",
+    "merge",
+    "fix_ci",
+    "learn",
+]
 
 
 def load_state():
@@ -60,7 +74,7 @@ def run_cmd(cmd, timeout=30):
         # Try to read from config
         gh_hosts = Path.home() / ".config" / "gh" / "hosts.yml"
         if gh_hosts.exists():
-            for line in gh_hosts.read_text().splitlines():
+            for line in gh_hosts.read_text(encoding="utf-8").splitlines():
                 if "oauth_token:" in line:
                     token = line.split("oauth_token:", 1)[1].strip()
                     break
@@ -136,7 +150,60 @@ def stage_diagnose():
 
 
 # ============================================================
-# STAGE 2: IMPLEMENT
+# STAGE 2: ENGINEERING ORCHESTRATOR
+# ============================================================
+def stage_orchestrate():
+    """Create/update auditable role manifests without changing branches."""
+    print("=== STAGE 2: ENGINEERING ORCHESTRATOR ===")
+    out, _, rc = run_cmd(
+        "gh pr list --repo stoltembergg-png/hermes-agent --state open "
+        "--json number,title,headRefName,headRefOid,baseRefOid --limit 30"
+    )
+    if rc != 0:
+        return {"error": "could not read open PRs"}
+    try:
+        prs = json.loads(out)
+    except json.JSONDecodeError:
+        return {"error": "invalid PR list"}
+
+    clean = not bool(run_cmd("git status --porcelain")[0].strip())
+    results = []
+    for pr in prs:
+        number = pr["number"]
+        files_out, _, files_rc = run_cmd(
+            f"gh pr diff {number} --repo stoltembergg-png/hermes-agent --name-only"
+        )
+        paths = files_out.splitlines() if files_rc == 0 else []
+        manifest = build_manifest(
+            number,
+            pr["title"],
+            pr["headRefName"],
+            paths,
+            identity={
+                "repo_root": REPO,
+                "worktree": str(Path.cwd()),
+                "branch": run_cmd("git branch --show-current")[0].strip(),
+                "worktree_head_sha": run_cmd("git rev-parse HEAD")[0].strip(),
+                "pr_head_sha": pr.get("headRefOid", ""),
+                "base_sha": pr.get("baseRefOid", ""),
+                "tracked_and_untracked_status": run_cmd("git status --porcelain")[0],
+            },
+            worktree_clean=clean,
+            no_secrets=False,
+        )
+        path = write_manifest(manifest, MANIFEST_DIR)
+        results.append({
+            "pr": number,
+            "manifest": str(path),
+            "roles": {r["role"]: r["status"] for r in manifest["roles"]},
+            "merge_allowed": manifest["gates"]["merge_allowed"],
+        })
+        print(f"  PR #{number}: manifest={path} merge_allowed=False (CI/role gates pending)")
+    return {"manifests": results, "worktree_clean": clean}
+
+
+# ============================================================
+# STAGE 3: IMPLEMENT
 # ============================================================
 def stage_implement():
     """Implement next PR from roadmap."""
@@ -152,97 +219,162 @@ def stage_implement():
 # STAGE 3: LINT + TEST
 # ============================================================
 def stage_lint_test():
-    """Run eslint --fix and pytest on all open PR branches."""
+    """Validate only the current worktree; never switch another PR's branch."""
     print("=== STAGE 3: LINT + TEST ===")
-    results = {"branches_checked": [], "fixes_applied": 0}
-
-    out, _, _ = run_cmd(
-        "gh pr list --repo stoltembergg-png/hermes-agent --state open --json headRefName --limit 20"
+    branch = run_cmd("git branch --show-current")[0].strip()
+    before = run_cmd("git status --porcelain")[0].strip()
+    _, eslint_err, eslint_rc = run_cmd(
+        "npx eslint apps/desktop/src/plugins/vector-channels/plugin.tsx "
+        "apps/desktop/src/plugins/vector-channels/api.ts --fix",
+        timeout=60,
     )
-    try:
-        prs = json.loads(out)
-    except json.JSONDecodeError:
-        prs = []
-
-    for pr in prs:
-        branch = pr["headRefName"]
-        print(f"  Checking branch: {branch}")
-
-        # Checkout branch
-        run_cmd(f"git stash 2>/dev/null; git checkout {branch} 2>&1 | tail -1")
-
-        # Run eslint --fix
-        out, err, rc = run_cmd(
-            "npx eslint apps/desktop/src/plugins/vector-channels/plugin.tsx apps/desktop/src/plugins/vector-channels/api.ts --fix 2>&1 | tail -5",
-            timeout=60
-        )
-        if rc == 0:
-            print(f"    ESLint: clean")
-        else:
-            print(f"    ESLint: {out[:100]}")
-
-        # Check for changes
-        out, _, _ = run_cmd("git diff --stat")
-        if out.strip():
-            print(f"    Changes detected — committing")
-            run_cmd("git add -A && git commit -s -m 'fix: auto-lint via pipeline'")
-            run_cmd(f"git push personal {branch} 2>&1 | tail -2", timeout=30)
-            results["fixes_applied"] += 1
-        else:
-            print(f"    No changes needed")
-
-        results["branches_checked"].append(branch)
-
-    # Run contract tests
-    out, err, rc = run_cmd(
+    out, err, pytest_rc = run_cmd(
         "source venv/bin/activate && python3 -m pytest vector/tests/ -q --tb=line 2>&1 | tail -5",
-        timeout=60
+        timeout=60,
     )
     print(f"  Contract tests: {out}")
-
-    return results
+    after = run_cmd("git status --porcelain")[0].strip()
+    return {
+        "branch": branch,
+        "eslint_exit": eslint_rc,
+        "pytest_exit": pytest_rc,
+        "dirty_before": bool(before),
+        "dirty_after": bool(after),
+        "changes_require_review": bool(after),
+        "stderr": (eslint_err or err)[-500:],
+    }
 
 
 # ============================================================
-# STAGE 4: MERGE
+# STAGES 5-7: ROLE GATES
 # ============================================================
-def stage_merge():
-    """Merge all PRs with green CI."""
-    print("=== STAGE 4: MERGE ===")
-    results = {"merged": [], "skipped": []}
+def _current_pr_manifest() -> Path | None:
+    out, _, rc = run_cmd("gh pr view --repo stoltembergg-png/hermes-agent --json number")
+    if rc != 0:
+        return None
+    try:
+        number = json.loads(out)["number"]
+    except (json.JSONDecodeError, KeyError):
+        return None
+    path = MANIFEST_DIR / f"pr-{number}.json"
+    return path if path.exists() else None
 
-    out, _, _ = run_cmd(
-        "gh pr list --repo stoltembergg-png/hermes-agent --state open --json number,title,headRefName --limit 20"
+
+def stage_security_review():
+    """Run a secret-pattern scan and record Security Engineer evidence."""
+    print("=== STAGE 5: SECURITY REVIEW ===")
+    manifest = _current_pr_manifest()
+    if manifest is None:
+        return {"status": "PENDING", "reason": "no current PR manifest"}
+    diff = run_cmd("git diff --binary HEAD^..HEAD")[0]
+    secret_pattern = re.compile(r"(?i)(api[_-]?key|secret|password|private[_-]?key)\\s*[:=]\\s*['\"][^'\"]{12,}")
+    found = bool(secret_pattern.search(diff))
+    status = "FAIL" if found else "PASS"
+    result = update_role(
+        manifest,
+        "security_engineer",
+        status,
+        ["git diff secret-pattern scan"],
+        "Potential credential pattern found" if found else "No credential pattern found; candidate remains subject to human review",
+    )
+    update_gates(manifest, no_secrets=not found)
+    return {"status": status, "merge_allowed": result["gates"]["merge_allowed"]}
+
+
+def stage_code_review():
+    """Record deterministic diff hygiene; semantic review remains explicit."""
+    print("=== STAGE 6: CODE REVIEW ===")
+    manifest = _current_pr_manifest()
+    if manifest is None:
+        return {"status": "PENDING", "reason": "no current PR manifest"}
+    _, _, diff_rc = run_cmd("git diff --check HEAD^..HEAD")
+    status = "PASS" if diff_rc == 0 else "FAIL"
+    result = update_role(
+        manifest,
+        "code_reviewer",
+        status,
+        ["git diff --check"],
+        "Whitespace and patch hygiene passed; semantic review still required" if status == "PASS" else "Patch hygiene failed",
+    )
+    return {"status": status, "merge_allowed": result["gates"]["merge_allowed"]}
+
+
+def stage_release():
+    """Evaluate CI, cleanliness and release evidence without merging."""
+    print("=== STAGE 7: DEVOPS/RELEASE REVIEW ===")
+    manifest = _current_pr_manifest()
+    if manifest is None:
+        return {"status": "PENDING", "reason": "no current PR manifest"}
+    pr_number = json.loads(run_cmd("gh pr view --repo stoltembergg-png/hermes-agent --json number")[0])["number"]
+    checks_out, _, checks_rc = run_cmd(
+        f"gh pr checks {pr_number} --repo stoltembergg-png/hermes-agent --json bucket,state,name"
     )
     try:
-        prs = json.loads(out)
+        checks = json.loads(checks_out) if checks_rc == 0 else []
+    except json.JSONDecodeError:
+        checks = []
+    ci_green = bool(checks) and all(c.get("bucket") in {"pass", "skipping"} for c in checks)
+    clean = not bool(run_cmd("git status --porcelain")[0].strip())
+    result = update_gates(manifest, ci_green=ci_green, worktree_clean=clean)
+    status = "PASS" if ci_green and clean else "PENDING"
+    result = update_role(
+        manifest,
+        "devops_release_engineer",
+        status,
+        ["gh pr checks JSON", "git status --porcelain"],
+        "CI green and worktree clean" if status == "PASS" else "Waiting for green CI and clean worktree",
+    )
+    return {"status": status, "ci_green": ci_green, "worktree_clean": clean, "merge_allowed": result["gates"]["merge_allowed"]}
+
+
+# ============================================================
+# STAGE 8: MERGE
+# ============================================================
+def stage_merge():
+    """Merge only PRs approved by the manifest and fully green in GitHub."""
+    print("=== STAGE 8: MERGE ===")
+    results = {"merged": [], "skipped": []}
+    out, _, rc = run_cmd(
+        "gh pr list --repo stoltembergg-png/hermes-agent --state open "
+        "--json number,title,isDraft --limit 20"
+    )
+    try:
+        prs = json.loads(out) if rc == 0 else []
     except json.JSONDecodeError:
         prs = []
 
     for pr in prs:
-        pr_num = pr["number"]
-        title = pr["title"]
-
-        # Check CI status
-        out, _, _ = run_cmd(
-            f"gh pr checks {pr_num} --repo stoltembergg-png/hermes-agent 2>&1 | head -3"
+        number = pr["number"]
+        if pr.get("isDraft"):
+            results["skipped"].append({"pr": number, "reason": "draft PR"})
+            continue
+        path = MANIFEST_DIR / f"pr-{number}.json"
+        if not path.exists():
+            results["skipped"].append({"pr": number, "reason": "manifest missing"})
+            continue
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+        checks_out, _, checks_rc = run_cmd(
+            f"gh pr checks {number} --repo stoltembergg-png/hermes-agent --json bucket,state,name"
         )
-
-        if "All checks were successful" in out:
-            print(f"  PR #{pr_num}: CI green — merging")
-            out, err, rc = run_cmd(
-                f"gh pr merge {pr_num} --repo stoltembergg-png/hermes-agent --squash --delete-branch --admin 2>&1 | tail -3",
-                timeout=30
-            )
-            if rc == 0 and "merged" in out.lower():
-                print(f"    MERGED")
-                results["merged"].append(pr_num)
-            else:
-                print(f"    Merge failed: {out[:100]}")
-                results["skipped"].append({"pr": pr_num, "reason": out[:100]})
+        try:
+            checks = json.loads(checks_out) if checks_rc == 0 else []
+        except json.JSONDecodeError:
+            checks = []
+        ci_green = bool(checks) and all(c.get("bucket") in {"pass", "skipping"} for c in checks)
+        manifest = update_gates(path, ci_green=ci_green)
+        gate = merge_gate(manifest)
+        if not gate["merge_allowed"]:
+            results["skipped"].append({"pr": number, "reason": "; ".join(gate["reasons"])})
+            print(f"  PR #{number}: skipped — {', '.join(gate['reasons'])}")
+            continue
+        _, _, merge_rc = run_cmd(
+            f"gh pr merge {number} --repo stoltembergg-png/hermes-agent --squash --delete-branch",
+            timeout=30,
+        )
+        if merge_rc == 0:
+            results["merged"].append(number)
         else:
-            print(f"  PR #{pr_num}: CI not green — skipping")
-            results["skipped"].append({"pr": pr_num, "reason": "CI not green"})
+            results["skipped"].append({"pr": number, "reason": "GitHub merge command failed"})
 
     print(f"  Merged: {len(results['merged'])}, Skipped: {len(results['skipped'])}")
     return results
@@ -252,43 +384,33 @@ def stage_merge():
 # STAGE 5: FIX CI
 # ============================================================
 def stage_fix_ci():
-    """Fix failing CI on open PRs."""
-    print("=== STAGE 5: FIX CI ===")
-    results = {"fixed": [], "still_failing": []}
-
-    out, _, _ = run_cmd(
-        "gh pr list --repo stoltembergg-png/hermes-agent --state open --json number,title,headRefName --limit 20"
+    """Diagnose CI failures without switching or mutating another branch."""
+    print("=== STAGE 9: FIX CI ===")
+    out, _, rc = run_cmd(
+        "gh pr list --repo stoltembergg-png/hermes-agent --state open "
+        "--json number,title,headRefName --limit 20"
     )
     try:
-        prs = json.loads(out)
+        prs = json.loads(out) if rc == 0 else []
     except json.JSONDecodeError:
         prs = []
-
+    results = {"failing": [], "action_required": []}
     for pr in prs:
-        pr_num = pr["number"]
-        branch = pr["headRefName"]
-
-        out, _, _ = run_cmd(
-            f"gh pr checks {pr_num} --repo stoltembergg-png/hermes-agent 2>&1 | head -5"
+        number = pr["number"]
+        checks, _, check_rc = run_cmd(
+            f"gh pr checks {number} --repo stoltembergg-png/hermes-agent --json bucket,state,name"
         )
-
-        if "failing" in out:
-            print(f"  PR #{pr_num}: CI failing — attempting fix")
-            # Checkout, eslint --fix, push
-            run_cmd(f"git stash 2>/dev/null; git checkout {branch} 2>&1 | tail -1")
-            run_cmd("npx eslint apps/desktop/src/plugins/vector-channels/plugin.tsx apps/desktop/src/plugins/vector-channels/api.ts --fix 2>&1 | tail -3", timeout=60)
-            out, _, _ = run_cmd("git diff --stat")
-            if out.strip():
-                run_cmd("git add -A && git commit -s -m 'fix: auto-fix CI lint via pipeline'")
-                run_cmd(f"git push personal {branch} 2>&1 | tail -2", timeout=30)
-                print(f"    Pushed fix")
-                results["fixed"].append(pr_num)
-            else:
-                print(f"    No lint auto-fix possible — needs manual intervention")
-                results["still_failing"].append({"pr": pr_num, "reason": "no auto-fix"})
-        else:
-            print(f"  PR #{pr_num}: CI OK")
-
+        if check_rc != 0:
+            results["action_required"].append({"pr": number, "reason": "could not read checks"})
+            continue
+        try:
+            data = json.loads(checks)
+        except json.JSONDecodeError:
+            data = []
+        failing = [item.get("name", "unknown") for item in data if item.get("bucket") == "fail"]
+        if failing:
+            results["failing"].append({"pr": number, "checks": failing})
+            results["action_required"].append({"pr": number, "reason": "use isolated worktree for fix"})
     return results
 
 
@@ -357,10 +479,18 @@ def main():
 
     if stage_name == "diagnose":
         result = stage_diagnose()
+    elif stage_name == "orchestrate":
+        result = stage_orchestrate()
     elif stage_name == "implement":
         result = stage_implement()
     elif stage_name == "lint_test":
         result = stage_lint_test()
+    elif stage_name == "security_review":
+        result = stage_security_review()
+    elif stage_name == "code_review":
+        result = stage_code_review()
+    elif stage_name == "release":
+        result = stage_release()
     elif stage_name == "merge":
         result = stage_merge()
     elif stage_name == "fix_ci":
