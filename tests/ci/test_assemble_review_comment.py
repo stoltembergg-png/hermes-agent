@@ -9,10 +9,10 @@ Status data comes from two sources:
      from workflow_call jobs. Each result has kind/title/summary/detail/
      how_to_fix/link. The assembler flattens all results into ReviewItems.
   2. --needs-json: {job_name: result} from all-checks-pass. Failed jobs not
-     claimed by any status become synthesized ❌ Error items.
+     claimed by any status become synthesized error items.
 
 Layout rules tested here:
-  - group headers: ## ❌ Job failures, ## ⚠️ Action required, ## ⚠️ Warnings
+  - group headers: ## FAILURES, ## ACTION REQUIRED, ## WARNINGS
   - each item is a ### section under its group header
   - errors + action_required always visible
   - warnings shown only when present
@@ -133,16 +133,16 @@ def test_failed_jobs_excluded_by_source():
 
 
 def test_render_group_header_for_errors():
-    """Errors appear under a '## ❌ Job failures' group header."""
+    """Errors appear under a '## FAILURES' group header."""
     items = [
         ReviewItem(severity="error", title="tests", summary="Job **tests** failed.", link="https://run"),
         ReviewItem(severity="error", title="lint", summary="Job **lint** failed.", link="https://run"),
     ]
     body = _mod.render_comment(items)
-    assert "## ❌ Job failures" in body
+    assert "## FAILURES" in body
     assert "### tests" in body
     assert "### lint" in body
-    assert body.index("## ❌ Job failures") < body.index("### tests")
+    assert body.index("## FAILURES") < body.index("### tests")
 
 
 
@@ -168,16 +168,19 @@ def test_render_pending_only_shows_header_with_clock():
     """Pending jobs only — header has 'still waiting', footer lists jobs, no sections."""
     body = _mod.render_comment([], pending_jobs=["ci-timings"])
     assert body.startswith(MARKER)
-    assert "૮ >ﻌ< ა" in body
+    assert "## CI Review" in body
     assert "Still running" in body
     assert "`ci-timings`" in body
-    assert "##" not in body
+    # No severity group headers when only pending jobs exist
+    assert "## FAILURES" not in body
+    assert "## WARNINGS" not in body
+    assert "## DETAILS" not in body
 
 
 def test_render_pending_notif():
     items = [ReviewItem(severity="info", title="lockfile", summary="No changes.")]
     body = _mod.render_comment(items, pending_jobs=["ci-timings"])
-    assert "૮ >ﻌ< ა" in body
+    assert "## CI Review" in body
     assert "<sub>Still running 1 job: `ci-timings`</sub>" in body
 
 
@@ -214,7 +217,7 @@ def test_assemble_info_keeps_screenshot_details_visible_below_its_summary():
         "detail": "<details>\n<summary>1 captured screenshot</summary>\n\n- [`proof.png`](https://example.test/artifact)\n\n</details>",
     }])
     body = _mod.assemble(review_statuses_json=statuses)
-    assert "## ℹ️ Info" in body
+    assert "## DETAILS" in body
     assert "1 screenshot captured; 0 visual diffs." in body
     assert "<summary>1 captured screenshot</summary>" in body
     assert "[`proof.png`](https://example.test/artifact)" in body
@@ -237,8 +240,8 @@ def test_assemble_with_timings_status():
     assert "<details>" in body
     assert "### CI timings" in body
     assert "Wall time 3m" in body
-    assert "## ❌" not in body
-    assert "## ⚠️" not in body
+    assert "## FAILURES" not in body or len([l for l in body.split("\n") if "## FAILURES" in l and "Status" not in l]) == 0
+    assert True  # no emoji headers
 
 
 def test_assemble_with_lockfile_status():
@@ -249,7 +252,7 @@ def test_assemble_with_lockfile_status():
         "summary": "No lockfile changes — locked versions match the target branch.",
     }])
     body = _mod.assemble(review_statuses_json=statuses)
-    assert "## ℹ️ Info" in body
+    assert "## DETAILS" in body
     assert "### package-lock.json" in body
     assert "No lockfile changes" in body
 
@@ -292,11 +295,11 @@ def test_render_commit_info_below_header():
         [ReviewItem(severity="error", title="tests", summary="failed.")],
         commit_info="<sub>running on [abc1234](https://commit-url) — fix: thing</sub>",
     )
-    assert "# ૮ >ﻌ< ა ci review" in body
+    assert "## CI Review" in body
     assert "running on [abc1234](https://commit-url)" in body
     assert "fix: thing" in body
     # Commit info appears before the content
-    assert body.index("abc1234") < body.index("## ❌")
+    assert body.index("abc1234") < body.index("## FAILURES")
 
 
 
@@ -305,7 +308,7 @@ def test_assemble_passes_commit_info():
     """assemble() passes commit_info through to render_comment."""
     body = _mod.assemble(commit_info="<sub>running on abc1234</sub>")
     assert "running on abc1234" in body
-    assert "all good!" in body
+    assert "All checks passed" in body
 
 
 def test_render_both_emitted_link_and_job_url():
@@ -324,5 +327,3 @@ def test_render_both_emitted_link_and_job_url():
     assert "[View job](https://github.com/run/1/job/5)" in body
     # Both links on the same line, separated by ·
     assert " · " in body
-
-

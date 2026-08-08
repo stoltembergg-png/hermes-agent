@@ -11,7 +11,7 @@ from typing import Callable
 
 from fastapi import APIRouter, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from vector.schemas import (
     AgentListResponse,
@@ -130,6 +130,19 @@ def create_vector_router(get_service: Callable) -> APIRouter:
             return _vector_error_handler(e)
         return _agent_to_out(profile)
 
+    @router.delete("/agents/{handle}", status_code=204)
+    def delete_agent(handle: str):
+        """Remove an agent from the registry. Returns 204 on success.
+
+        Implements PR-016 (delete_agent endpoint).
+        """
+        svc = get_service()
+        try:
+            svc.delete_agent(handle)
+        except AgentNotFoundError as e:
+            return _vector_error_handler(e)
+        return Response(status_code=204)
+
     @router.get("/channels")
     def list_channels():
         svc = get_service()
@@ -146,6 +159,19 @@ def create_vector_router(get_service: Callable) -> APIRouter:
         except ChannelTooLargeError as e:
             return _vector_error_handler(e)
         return _channel_to_out(ch)
+
+    @router.delete("/channels/{channel_id}", status_code=204)
+    def delete_channel(channel_id: str):
+        """Remove a channel and its memberships + messages. Returns 204.
+
+        Implements PR-016 (delete_channel endpoint).
+        """
+        svc = get_service()
+        try:
+            svc.delete_channel(channel_id)
+        except ChannelNotFound as e:
+            return _vector_error_handler(e)
+        return Response(status_code=204)
 
     @router.get("/channels/{channel_id}/members")
     def list_members(channel_id: str):

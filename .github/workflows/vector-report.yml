@@ -1,0 +1,341 @@
+name: Vector Project Report
+
+on:
+  schedule:
+    # A cada 3 dias, 09:00 UTC (06:00 BRT)
+    - cron: '0 9 */3 * *'
+  workflow_dispatch:
+    inputs:
+      force_new_issue:
+        description: 'Force new issue even if related one is open'
+        required: false
+        default: 'false'
+
+permissions:
+  issues: write
+  contents: read
+  pull-requests: read
+  actions: read
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Collect repo state
+        id: collect
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          REPORT_DATE=$(date -u +%Y-%m-%d)
+          SINCE=$(date -u -d '3 days ago' +%Y-%m-%d)
+
+          # Merged PRs in last 3 days
+          MERGED=$(gh pr list --state merged --limit 50 \
+            --json number,title,mergedAt,headRefName \
+            --jq '.[] | select(.mergedAt >= "'$SINCE'T00:00:00Z") | "- #\(.number) \(.title) [\(.headRefName)]"' || true)
+          MERGED="${MERGED:-_None_}"
+
+          # Open draft PRs (roadmap backlog)
+          OPEN_DRAFTS=$(gh pr list --state open --draft --limit 50 \
+            --json number,title,headRefName \
+            --jq '.[] | "- #\(.number) \(.title) [\(.headRefName)]"' || true)
+          OPEN_DRAFTS="${OPEN_DRAFTS:-_None_}"
+
+          # Open PRs ready for review
+          OPEN_READY=$(gh pr list --state open --search 'draft:false' --limit 20 \
+            --json number,title,headRefName \
+            --jq '.[] | "- #\(.number) \(.title) [\(.headRefName)]"' || true)
+          OPEN_READY="${OPEN_READY:-_None_}"
+
+          # Failed CI runs in last 3 days
+          FAILED_CHECKS=$(gh run list --limit 50 --json databaseId,name,status,conclusion,createdAt \
+            --jq '.[] | select(.createdAt >= "'$SINCE'T00:00:00Z" and .conclusion == "failure") | "- \(.name) (run \(.databaseId))"' || true)
+          FAILED_CHECKS="${FAILED_CHECKS:-_None_}"
+
+          # Commits in last 3 days
+          COMMITS=$(git log --since="$SINCE 00:00:00" --oneline --no-merges 2>/dev/null | head -30 || true)
+          COMMITS="${COMMITS:-_None_}"
+
+          # Vector project metrics
+          PY_FILES=$(find vector/ -name '*.py' -not -path '*/__pycache__/*' 2>/dev/null | wc -l || echo "0")
+          PY_LINES=$(find vector/ -name '*.py' -not -path '*/__pycache__/*' -exec cat {} + 2>/dev/null | wc -l || echo "0")
+          PY_TESTS=$(grep -r 'def test_' vector/tests/ --include='*.py' -l 2>/dev/null | wc -l || echo "0")
+          PY_TEST_COUNT=$(grep -r 'def test_' vector/tests/ --include='*.py' 2>/dev/null | wc -l || echo "0")
+
+          # Desktop plugin metrics
+          TSX_FILES=$(find apps/desktop/src/plugins/vector-channels -name '*.tsx' -o -name '*.ts' 2>/dev/null | wc -l || echo "0")
+          TSX_LINES=$(find apps/desktop/src/plugins/vector-channels -name '*.tsx' -o -name '*.ts' -exec cat {} + 2>/dev/null | wc -l || echo "0")
+          CSS_LINES=$(find apps/desktop/src/plugins/vector-channels -name '*.css' -exec cat {} + 2>/dev/null | wc -l || echo "0")
+
+          # Backend plugin metrics
+          PY_PLUGIN_FILES=$(find plugins/vector-channels -name '*.py' 2>/dev/null | wc -l || echo "0")
+          PY_PLUGIN_LINES=$(find plugins/vector-channels -name '*.py' -exec cat {} + 2>/dev/null | wc -l || echo "0")
+
+          # Spec features
+          SPEC_FEATURES=$(ls -d .spec/features/*/ 2>/dev/null | wc -l || echo "0")
+          SPEC_EVIDENCE=$(ls .spec/verification/*.json 2>/dev/null | wc -l || echo "0")
+
+          # Roadmap specs
+          ROADMAP_PRS=$(ls docs/roadmap/prs/PR-*.md 2>/dev/null | wc -l || echo "0")
+
+          # Open issues
+          OPEN_ISSUES=$(gh issue list --state open --limit 20 \
+            --json number,title,labels \
+            --jq '.[] | "- #\(.number) \(.title) [\([.labels[].name] | join(", "))]"' || true)
+          OPEN_ISSUES="${OPEN_ISSUES:-_None_}"
+
+          # Latest release
+          LATEST_RELEASE=$(gh release list --limit 3 \
+            --json tagName,name,isDraft,publishedAt \
+            --jq '.[] | "- \(.name) (\(.tagName)) draft=\(.isDraft) \(.publishedAt)"' || true)
+          LATEST_RELEASE="${LATEST_RELEASE:-_None_}"
+
+          # Skills installed
+          SKILLS_COUNT=$(find ~/.hermes/skills -name "SKILL.md" -type f 2>/dev/null | wc -l || echo "0")
+
+          # Cron jobs active (from config)
+          CRON_JOBS=$(grep -r "schedule:" ~/.hermes/cron/ 2>/dev/null | wc -l || echo "0")
+
+          {
+            echo "REPORT_DATE=$REPORT_DATE"
+            echo "MERGED_PRS<<MERGED_EOF"
+            echo "$MERGED"
+            echo "MERGED_EOF"
+            echo "OPEN_DRAFTS<<DRAFTS_EOF"
+            echo "$OPEN_DRAFTS"
+            echo "DRAFTS_EOF"
+            echo "OPEN_READY<<READY_EOF"
+            echo "$OPEN_READY"
+            echo "READY_EOF"
+            echo "FAILED_CHECKS<<FAIL_EOF"
+            echo "$FAILED_CHECKS"
+            echo "FAIL_EOF"
+            echo "COMMITS<<COMMITS_EOF"
+            echo "$COMMITS"
+            echo "COMMITS_EOF"
+            echo "OPEN_ISSUES<<ISSUES_EOF"
+            echo "$OPEN_ISSUES"
+            echo "ISSUES_EOF"
+            echo "LATEST_RELEASE<<RELEASE_EOF"
+            echo "$LATEST_RELEASE"
+            echo "RELEASE_EOF"
+            echo "PY_FILES=$PY_FILES"
+            echo "PY_LINES=$PY_LINES"
+            echo "PY_TESTS=$PY_TESTS"
+            echo "PY_TEST_COUNT=$PY_TEST_COUNT"
+            echo "TSX_FILES=$TSX_FILES"
+            echo "TSX_LINES=$TSX_LINES"
+            echo "CSS_LINES=$CSS_LINES"
+            echo "PY_PLUGIN_FILES=$PY_PLUGIN_FILES"
+            echo "PY_PLUGIN_LINES=$PY_PLUGIN_LINES"
+            echo "SPEC_FEATURES=$SPEC_FEATURES"
+            echo "SPEC_EVIDENCE=$SPEC_EVIDENCE"
+            echo "ROADMAP_PRS=$ROADMAP_PRS"
+            echo "SKILLS_COUNT=$SKILLS_COUNT"
+            echo "CRON_JOBS=$CRON_JOBS"
+          } >> "$GITHUB_ENV"
+
+      - name: Generate report via LLM
+        id: llm
+        env:
+          XIAOMI_MIMO_API_KEY: ${{ secrets.XIAOMI_MIMO_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          PROMPT='Você é um engenheiro sênior analisando o estado do projeto Vector — uma camada de orquestração multi-agente sobre o Hermes Agent (Python/FastAPI backend + React/TypeScript desktop plugin).
+          
+          Foque no PROJETO: código, arquitetura, correções, melhorias e progresso do roadmap.
+          NÃO foque em CI/CD, workflows do GitHub, ou status de checks como métrica principal.
+          
+          Gere um relatório estruturado em markdown (português do Brasil) com:
+
+          ## Resumo
+          - Progresso desde a última análise (PRs merged, commits, testes)
+          - Estado geral do código (backend Python + frontend TypeScript)
+
+          ## Metricas do Projeto
+          - Tabela compacta: arquivos, linhas, testes por area (vector core, desktop plugin, backend plugin)
+
+          ## Pontos Fortes
+          - O que esta bem arquitetado ou implementado
+
+          ## Problemas e Riscos
+          - Bugs potenciais, code smells, debito tecnico
+          - Modulos faltantes ou incompletos
+          - Riscos arquiteturais
+
+          ## Correcoes e Melhorias
+          - Para cada item:
+            - O que: problema ou melhoria especifica
+            - Como corrigir: passo a passo tecnico (arquivos, funcoes)
+            - Prioridade: alta/media/baixa
+          - Sugira as proximas 2-3 PRs do roadmap que deveriam ser implementadas
+
+          ## Labels Sugeridas
+          - 1-3 labels (ex: vector, frontend, backend, architecture, tests)
+
+          Dados do repositorio:
+
+          ### Metricas
+          - Vector core: $PY_FILES arquivos Python, $PY_LINES linhas, $PY_TEST_COUNT testes em $PY_TESTS arquivos
+          - Desktop plugin: $TSX_FILES arquivos TSX/TS, $TSX_LINES linhas, $CSS_LINES linhas CSS
+          - Backend plugin: $PY_PLUGIN_FILES arquivos, $PY_PLUGIN_LINES linhas
+          - Spec features: $SPEC_FEATURES, evidencias: $SPEC_EVIDENCE
+          - Roadmap PRs documentadas: $ROADMAP_PRS
+          - Skills instaladas: $SKILLS_COUNT
+          - Cron jobs ativos: $CRON_JOBS
+
+          ### Commits Recentes (ultimos 3 dias)
+          $COMMITS
+
+          ### PRs Mergeadas (ultimos 3 dias)
+          $MERGED_PRS
+
+          ### PRs Draft (roadmap backlog)
+          $OPEN_DRAFTS
+
+          ### PRs Ready for Review
+          $OPEN_READY
+
+          ### Issues Abertas
+          $OPEN_ISSUES
+
+          ### Releases Recentes
+          $LATEST_RELEASE
+
+          ### Falhas de CI (ultimos 3 dias)
+          $FAILED_CHECKS
+
+          ### Roadmap
+          O projeto Vector segue um roadmap de PR-001 a PR-024.
+          PR-001 a PR-013: MERGED (profiles, mention parser, channel store, runtime, dispatcher, CLI, desktop panel, gateway API, E2E tests, provider picker)
+          PR-014 a PR-024: DRAFT (visible agent list, sidebar icons, delete backend/frontend, channel members, timestamps, edit agent profile, delegate_task integration, CLI subcommand, config schema, WebSocket events)
+          Fases: Core (PR-001..007), Desktop UX (PR-008..014), CRUD (PR-015..020), Integration (PR-021..024)
+
+          ### Data
+          $REPORT_DATE'
+
+          # Call Xiaomi MiMo API (v2.5)
+          # MiMo is a reasoning model: produces reasoning_content BEFORE content.
+          # Need high max_tokens (8192) so reasoning finishes and content is non-empty.
+          RESPONSE=$(curl -sS --max-time 180 \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $XIAOMI_MIMO_API_KEY" \
+            -d "$(jq -n --arg prompt "$PROMPT" \
+              '{
+                model: "mimo-v2.5",
+                messages: [
+                  {role: "system", content: "Você é um engenheiro de desenvolvimento sênior que gera relatórios técnico-gerenciais em português do Brasil. Seja conciso, específico e actionável. Cite números de PR, nomes de arquivos e IDs de REQ/AC quando relevante. Foque na resposta final, não em raciocínio longo."},
+                  {role: "user", content: $prompt}
+                ],
+                temperature: 0.3,
+                max_tokens: 8192
+              }')" \
+            "https://api.xiaomimimo.com/v1/chat/completions")
+
+          # MiMo puts final answer in .content, reasoning in .reasoning_content
+          REPORT_CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // empty')
+
+          if [ -z "$REPORT_CONTENT" ] || [ "$REPORT_CONTENT" = "null" ]; then
+            echo "::error::MiMo API returned empty content. The reasoning model may have exhausted the token budget before producing final answer."
+            echo "$RESPONSE" > mimo_error.json
+            # Salvage reasoning_content as fallback
+            REASONING=$(echo "$RESPONSE" | jq -r '.choices[0].message.reasoning_content // empty')
+            if [ -n "$REASONING" ]; then
+              echo "::warning::Content empty but reasoning_content has ${#REASONING} chars. Using as fallback."
+              REPORT_CONTENT="> Relatorio gerado a partir do reasoning_content (max_tokens insuficiente para content completo).
+
+          $REASONING"
+            else
+              exit 1
+            fi
+          fi
+
+          # Extract suggested labels
+          LABELS=$(echo "$REPORT_CONTENT" | sed -n '/## Labels Sugeridas/,/## /p' | tail -n +2 | head -10 | grep -oE '\b[a-z-]+\b' | head -3 | sort -u | tr '\n' ',' | sed 's/,$//')
+
+          echo "report<<REPORT_EOF" >> "$GITHUB_OUTPUT"
+          echo "$REPORT_CONTENT" >> "$GITHUB_OUTPUT"
+          echo "REPORT_EOF" >> "$GITHUB_OUTPUT"
+          echo "labels=$LABELS" >> "$GITHUB_OUTPUT"
+          echo "$REPORT_CONTENT" > mimo_report.md
+
+      - name: Find related open issue
+        id: related
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          THEME=$(echo "${{ steps.llm.outputs.labels }}" | cut -d, -f1)
+          if [ -z "$THEME" ]; then
+            echo "related_issue=" >> "$GITHUB_OUTPUT"
+            echo "theme=general" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "theme=$THEME" >> "$GITHUB_OUTPUT"
+          RELATED=$(gh issue list --state open --label "$THEME" --limit 5 \
+            --json number,createdAt,title \
+            --jq '.[] | select(.createdAt >= "'$(date -u -d '7 days ago' +%Y-%m-%d)'T00:00:00Z") | .number' \
+            | tail -1)
+          if [ -n "$RELATED" ] && [ "${{ github.event.inputs.force_new_issue }}" != "true" ]; then
+            echo "related_issue=$RELATED" >> "$GITHUB_OUTPUT"
+          else
+            echo "related_issue=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish report
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPORT: ${{ steps.llm.outputs.report }}
+          LABELS: ${{ steps.llm.outputs.labels }}
+          RELATED_ISSUE: ${{ steps.related.outputs.related_issue }}
+        run: |
+          set -euo pipefail
+
+          IFS=',' read -ra LABEL_ARRAY <<< "$LABELS"
+          for label in "${LABEL_ARRAY[@]}"; do
+            label=$(echo "$label" | xargs)
+            if [ -n "$label" ]; then
+              gh label create "$label" --color "5319e7" --force 2>/dev/null || true
+            fi
+          done
+
+          gh label create "report" --color "0e8a16" --force 2>/dev/null || true
+          gh label create "periodic" --color "fbca04" --force 2>/dev/null || true
+
+          LABELS_WITH_STANDARD="$LABELS,report,periodic"
+
+          if [ -n "$RELATED_ISSUE" ]; then
+            gh issue comment "$RELATED_ISSUE" --body "Atualizacao $REPORT_DATE
+
+          $REPORT
+
+          ---
+          _Atualizacao do relatorio periodico — mesma tematica da issue original_"
+            echo "Commented on issue #$RELATED_ISSUE"
+          else
+            gh issue create \
+              --title "Vector Report - $REPORT_DATE" \
+              --label "$LABELS_WITH_STANDARD" \
+              --body "$REPORT
+
+          ---
+          _Relatorio gerado automaticamente via workflow GitHub Actions usando GLM-5.2 via NVIDIA NIM._"
+            echo "Created new issue"
+          fi
+
+      - name: Upload report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vector-report-${{ env.REPORT_DATE }}
+          path: mimo_report.md
+          retention-days: 30
