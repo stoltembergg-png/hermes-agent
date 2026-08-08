@@ -10,11 +10,15 @@ on:
         description: 'Force new issue even if related one is open'
         required: false
         default: 'false'
+      publish_pr_comments:
+        description: 'Publish or update AI review comments on open PRs'
+        required: false
+        default: 'false'
 
 permissions:
   issues: write
   contents: read
-  pull-requests: read
+  pull-requests: write
   actions: read
 
 jobs:
@@ -53,6 +57,23 @@ jobs:
             --json number,title,headRefName \
             --jq '.[] | "- #\(.number) \(.title) [\(.headRefName)]"' || true)
           OPEN_READY="${OPEN_READY:-_None_}"
+
+          # Collect bounded, read-only context for AI review. PR code is never
+          # executed here; only metadata, diff text, and GitHub check results
+          # are sent to MiMo for analysis.
+          PR_CONTEXT_FILE="$RUNNER_TEMP/vector-pr-context.md"
+          : > "$PR_CONTEXT_FILE"
+          for PR_NUMBER in $(gh pr list --state open --limit 10 --json number --jq '.[].number'); do
+            echo "### PR #$PR_NUMBER" >> "$PR_CONTEXT_FILE"
+            gh pr view "$PR_NUMBER" --json number,title,body,headRefName,headRefOid,baseRefName,isDraft,reviewDecision \
+              --jq '"title: \(.title)\nhead: \(.headRefName) @ \(.headRefOid)\nbase: \(.baseRefName)\ndraft: \(.isDraft)\nreview: \(.reviewDecision // "UNKNOWN")\nbody:\n\(.body // "_No description_")"' >> "$PR_CONTEXT_FILE" || true
+            echo -e "\ndiff (bounded to 12000 chars):" >> "$PR_CONTEXT_FILE"
+            gh pr diff "$PR_NUMBER" 2>/dev/null | head -c 12000 >> "$PR_CONTEXT_FILE" || true
+            echo -e "\nchecks:" >> "$PR_CONTEXT_FILE"
+            gh pr checks "$PR_NUMBER" --json name,state,bucket,link 2>/dev/null | head -c 6000 >> "$PR_CONTEXT_FILE" || true
+            echo -e "\n" >> "$PR_CONTEXT_FILE"
+          done
+          PR_CONTEXT=$(cat "$PR_CONTEXT_FILE")
 
           # Failed CI runs in last 3 days
           FAILED_CHECKS=$(gh run list --limit 50 --json databaseId,name,status,conclusion,createdAt \
@@ -140,6 +161,9 @@ jobs:
             echo "ROADMAP_PRS=$ROADMAP_PRS"
             echo "SKILLS_COUNT=$SKILLS_COUNT"
             echo "CRON_JOBS=$CRON_JOBS"
+            echo "PR_CONTEXT<<PR_CONTEXT_EOF"
+            echo "$PR_CONTEXT"
+            echo "PR_CONTEXT_EOF"
           } >> "$GITHUB_ENV"
 
       - name: Generate report via LLM
@@ -150,7 +174,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          PROMPT='Você é um engenheiro sênior analisando o estado do projeto Vector — uma camada de orquestração multi-agente sobre o Hermes Agent (Python/FastAPI backend + React/TypeScript desktop plugin).
+          PROMPT=$(cat <<EOF
+          Você é um engenheiro sênior analisando o estado do projeto Vector — uma camada de orquestração multi-agente sobre o Hermes Agent (Python/FastAPI backend + React/TypeScript desktop plugin).
           
           Foque no PROJETO: código, arquitetura, correções, melhorias e progresso do roadmap.
           NÃO foque em CI/CD, workflows do GitHub, ou status de checks como métrica principal.
@@ -205,6 +230,22 @@ jobs:
           ### PRs Ready for Review
           $OPEN_READY
 
+          ### Análise detalhada das PRs abertas
+          $PR_CONTEXT
+
+          Para cada PR aberta, gere uma seção exatamente no formato:
+          ## PR #N — título
+          - Veredito: READY, NEEDS_WORK ou BLOCKED
+          - Insights: 2-4 observações específicas baseadas no diff
+          - Problemas/correções propostas: arquivos, funções e mudança concreta
+          - Teste interno recomendado: comandos seguros e critérios de aprovação
+          - Riscos: segurança, regressão, compatibilidade e release
+          - Comentário sugerido para a PR: texto curto, acionável e respeitoso
+
+          Não invente resultados de testes. Diferencie claramente evidência observada,
+          hipótese e recomendação. Não recomende merge quando houver check pending,
+          failing, draft, worktree/commit inconsistente ou ausência de testes.
+
           ### Issues Abertas
           $OPEN_ISSUES
 
@@ -221,7 +262,9 @@ jobs:
           Fases: Core (PR-001..007), Desktop UX (PR-008..014), CRUD (PR-015..020), Integration (PR-021..024)
 
           ### Data
-          $REPORT_DATE'
+          $REPORT_DATE
+          EOF
+          )
 
           # Call Xiaomi MiMo API (v2.5)
           # MiMo is a reasoning model: produces reasoning_content BEFORE content.
@@ -329,9 +372,40 @@ jobs:
               --body "$REPORT
 
           ---
-          _Relatorio gerado automaticamente via workflow GitHub Actions usando GLM-5.2 via NVIDIA NIM._"
+          _Relatorio gerado automaticamente via workflow GitHub Actions usando Xiaomi MiMo (mimo-v2.5)._"
             echo "Created new issue"
           fi
+
+      - name: Publish optional PR review comments
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.publish_pr_comments == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPORT_FILE: mimo_report.md
+        run: |
+          set -euo pipefail
+          for PR_NUMBER in $(gh pr list --state open --limit 10 --json number --jq '.[].number'); do
+            SECTION=$(awk -v pr="$PR_NUMBER" '
+              index($0, "## PR #" pr " —") == 1 { found=1; next }
+              found && /^## PR #[0-9]+ —/ { exit }
+              found { print }
+            ' "$REPORT_FILE")
+            [ -n "$SECTION" ] || continue
+            MARKER="<!-- vector-ai-review:$PR_NUMBER -->"
+            BODY="$MARKER
+
+            $SECTION
+
+            _Gerado pelo workflow Vector Project Report usando Xiaomi MiMo. Atualizado automaticamente; não substitui revisão humana._"
+            COMMENT_ID=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/$PR_NUMBER/comments?per_page=100" \
+              --jq ".[] | select(.body | startswith(\"$MARKER\")) | .id" | head -1 || true)
+            if [ -n "$COMMENT_ID" ]; then
+              gh api --method PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/$COMMENT_ID" -f body="$BODY" >/dev/null
+              echo "Updated AI review on PR #$PR_NUMBER"
+            else
+              gh pr comment "$PR_NUMBER" --body "$BODY" >/dev/null
+              echo "Created AI review on PR #$PR_NUMBER"
+            fi
+          done
 
       - name: Upload report artifact
         uses: actions/upload-artifact@v4
