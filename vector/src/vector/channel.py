@@ -275,6 +275,40 @@ class ChannelStore:
         ).fetchall()
         return [_row_to_channel(r) for r in rows]
 
+    def delete_channel(self, channel_id: str) -> None:
+        """Remove a channel and all its related data (memberships, messages).
+
+        The messages table has foreign-key walls pointing at channels(id),
+        but the FTS5 virtual table is kept in sync by triggers, so we delete
+        messages first, then memberships, then the channel row itself. A
+        single transaction keeps this atomic. Raises
+        ``ChannelNotFoundError`` if the channel does not exist.
+
+        Implements PR-016 (delete_channel).
+        """
+        # Validate the channel exists first so callers get a 404, not a
+        # silent noop.
+        row = self._conn.execute(
+            "SELECT 1 FROM channels WHERE id = ?", (channel_id,)
+        ).fetchone()
+        if row is None:
+            raise ChannelNotFoundError(f"no channel with id {channel_id!r}")
+        try:
+            self._conn.execute("BEGIN")
+            self._conn.execute(
+                "DELETE FROM messages WHERE channel_id = ?", (channel_id,)
+            )
+            self._conn.execute(
+                "DELETE FROM memberships WHERE channel_id = ?", (channel_id,)
+            )
+            self._conn.execute(
+                "DELETE FROM channels WHERE id = ?", (channel_id,)
+            )
+            self._conn.execute("COMMIT")
+        except Exception:
+            self._conn.execute("ROLLBACK")
+            raise
+
     # -- membership --------------------------------------------------------
 
     def add_member(self, channel_id: str, handle: str) -> Membership:

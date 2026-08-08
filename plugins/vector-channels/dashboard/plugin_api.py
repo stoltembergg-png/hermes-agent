@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 log = logging.getLogger(__name__)
 
@@ -123,6 +123,47 @@ async def health() -> JSONResponse:
     return JSONResponse({"status": "ok", "version": "0.1.0", "storage": svc.health_storage()})
 
 
+@router.get("/models")
+async def list_models() -> JSONResponse:
+    """Return the Hermes provider/model catalog (PR-013).
+
+    This is the same shape as the dashboard ``/api/model/options`` endpoint
+    and the TUI ``model.options`` JSON-RPC method — the canonical picker
+    payload built by ``hermes_cli.inventory.build_model_options_payload``.
+
+    Importantly, this does NOT touch the VectorService: the model catalog is
+    a Hermes-core concern (provider credentials, curated model lists,
+    pricing). The Add Agent modal uses this to populate its provider/model
+    <select> dropdowns. Empty provider/model on the agent-create request
+    means "inherit session defaults"; explicit values here let the user
+    pin an agent to a specific model.
+    """
+    try:
+        from hermes_cli.inventory import (
+            build_model_options_payload,
+            load_picker_context,
+        )
+
+        payload = build_model_options_payload(load_picker_context())
+        # Trim each provider row to the fields the desktop picker needs so we
+        # don't ship pricing/capabilities blobs the UI never renders.
+        providers = []
+        for row in payload.get("providers", []):
+            providers.append({
+                "slug": row.get("slug"),
+                "name": row.get("name") or row.get("slug"),
+                "models": list(row.get("models") or []),
+            })
+        return JSONResponse({
+            "providers": providers,
+            "model": payload.get("model") or "",
+            "provider": payload.get("provider") or "",
+        })
+    except Exception as e:
+        log.exception("vector-channels GET /models failed")
+        return _err("VECTOR_MODEL_OPTIONS_FAILED", str(e), 500)
+
+
 @router.get("/agents")
 async def list_agents() -> JSONResponse:
     svc = _get_service()
@@ -153,6 +194,25 @@ async def create_agent(request: Request) -> JSONResponse:
         return _err("VECTOR_BAD_REQUEST", str(e), 400)
 
 
+@router.delete("/agents/{handle}")
+async def delete_agent(handle: str) -> JSONResponse:
+    """Remove an agent from the registry. Returns 204 on success.
+
+    Implements PR-016 (delete_agent endpoint).
+    """
+    svc = _get_service()
+    if svc is None:
+        return _err("VECTOR_NOT_INITIALIZED", "Vector module not loaded", 503)
+    try:
+        svc.delete_agent(handle)
+        return Response(status_code=204)
+    except Exception as e:
+        # AgentNotFoundError -> 404; anything else -> 500
+        if "not found" in str(e).lower():
+            return _err("VECTOR_AGENT_NOT_FOUND", str(e), 404)
+        return _err("VECTOR_INTERNAL_ERROR", str(e), 500)
+
+
 @router.get("/channels")
 async def list_channels() -> JSONResponse:
     svc = _get_service()
@@ -177,6 +237,24 @@ async def create_channel(request: Request) -> JSONResponse:
         return JSONResponse(_channel_to_dict(ch), status_code=201)
     except Exception as e:
         return _err("VECTOR_BAD_REQUEST", str(e), 400)
+
+
+@router.delete("/channels/{channel_id}")
+async def delete_channel(channel_id: str) -> JSONResponse:
+    """Remove a channel and its memberships + messages. Returns 204 on success.
+
+    Implements PR-016 (delete_channel endpoint).
+    """
+    svc = _get_service()
+    if svc is None:
+        return _err("VECTOR_NOT_INITIALIZED", "Vector module not loaded", 503)
+    try:
+        svc.delete_channel(channel_id)
+        return Response(status_code=204)
+    except Exception as e:
+        if "not found" in str(e).lower():
+            return _err("VECTOR_CHANNEL_NOT_FOUND", str(e), 404)
+        return _err("VECTOR_INTERNAL_ERROR", str(e), 500)
 
 
 @router.get("/channels/{channel_id}/members")
