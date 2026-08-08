@@ -111,42 +111,46 @@ def protected_paths(paths: list[str]) -> list[str]:
 
 
 def quality_score(manifest: dict[str, Any]) -> int:
-    """Score observable quality without allowing subjective model claims."""
-    roles = manifest.get("roles", [])
-    role_points = sum(
-        4 if role.get("status") in {"PASS", "NOT_APPLICABLE"} else 0
-        for role in roles
-    )
+    """Score only reproducible gates; role claims remain a separate hard gate."""
     gates = manifest.get("gates", {})
-    gate_points = sum(
+    return sum(
         weight
         for key, weight in (
-            ("tests_green", 15),
-            ("lint_green", 15),
-            ("security_green", 15),
-            ("ci_green", 10),
+            ("tests_green", 25),
+            ("lint_green", 20),
+            ("security_green", 20),
+            ("ci_green", 20),
             ("worktree_clean", 5),
-            ("no_secrets", 5),
+            ("no_secrets", 10),
         )
         if gates.get(key) is True
     )
-    return min(100, role_points + gate_points)
 
 
 def evaluate_quality(manifest: dict[str, Any]) -> dict[str, Any]:
-    """Return a monotonic quality decision for the current manifest."""
+    """Return a fail-closed, monotonic quality decision."""
     score = quality_score(manifest)
     previous = manifest.get("quality_gate", {})
-    baseline = float(previous.get("baseline_score", QUALITY_MINIMUM_SCORE))
+    baseline_id = str(previous.get("baseline_id", "")).strip()
+    baseline_raw = previous.get("baseline_score")
+    baseline = float(baseline_raw) if baseline_raw is not None else QUALITY_MINIMUM_SCORE
     changed = manifest.get("evidence", {}).get("changed_files", [])
     protected = protected_paths(changed)
     regressions: list[str] = []
+    status = "PASS"
+    if not baseline_id:
+        status = "BLOCKED_NO_BASELINE"
+        regressions.append("quality baseline is missing or unidentified")
     if score < baseline:
+        status = "REGRESSION"
         regressions.append(f"quality score {score} is below baseline {baseline:g}")
     if protected:
+        status = "BLOCKED_PROTECTED_PATH"
         regressions.append("agent change touches protected CI/workflow paths")
     return {
+        "status": status,
         "score": score,
+        "baseline_id": baseline_id,
         "baseline_score": baseline,
         "delta": round(score - baseline, 2),
         "regressions": regressions,
@@ -216,6 +220,10 @@ def build_manifest(
             "no_secrets": no_secrets,
         },
     }
+    manifest["quality_gate"] = {
+        "baseline_id": os.environ.get("VECTOR_QUALITY_BASELINE_ID", ""),
+        "baseline_score": float(os.environ.get("VECTOR_QUALITY_BASELINE_SCORE", str(QUALITY_MINIMUM_SCORE))),
+    }
     manifest["quality_gate"] = evaluate_quality(manifest)
     manifest["gates"].update(merge_gate(manifest))
     return manifest
@@ -224,6 +232,25 @@ def build_manifest(
 def write_manifest(manifest: dict[str, Any], root: Path) -> Path:
     root.mkdir(parents=True, exist_ok=True)
     path = root / f"pr-{manifest['pr']}.json"
+    if path.exists():
+        try:
+            existing = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            existing = {}
+        old_sha = existing.get("identity", {}).get("pr_head_sha")
+        new_sha = manifest.get("identity", {}).get("pr_head_sha")
+        if old_sha and new_sha and old_sha == new_sha:
+            for key in ("roles", "gates", "quality_gate"):
+                if key in existing:
+                    manifest[key] = existing[key]
+            for key in ("comment_actions", "comments", "decisions"):
+                if key in existing:
+                    manifest[key] = existing[key]
+            manifest.setdefault("evidence", {}).update(
+                {key: value for key, value in existing.get("evidence", {}).items() if key != "changed_files"}
+            )
+            manifest["quality_gate"] = evaluate_quality(manifest)
+            manifest["gates"].update(merge_gate(manifest))
     path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return path
 
