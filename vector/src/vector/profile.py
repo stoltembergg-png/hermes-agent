@@ -318,6 +318,20 @@ class AgentRegistry:
         except KeyError as exc:
             raise KeyError(f"no profile registered with handle {handle!r}") from exc
 
+    def delete_agent(self, handle: str) -> None:
+        """Remove an agent profile from the registry by handle.
+
+        Thin wrapper over :meth:`remove` that returns ``None`` and raises
+        ``KeyError`` (not a removed-profile) when the handle is absent.
+        Used by the VectorService's :meth:`delete_agent` (PR-016) so that
+        API callers get a clean ``204`` on success and a ``404`` descriptor
+        via the service-layer ``AgentNotFoundError`` when the agent is
+        missing.
+
+        Implements PR-016 delete_agent.
+        """
+        self.remove(handle)  # raises KeyError if not found
+
     # ----- queries -----
 
     def get(self, handle: str) -> AgentProfile:
