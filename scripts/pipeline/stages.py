@@ -229,7 +229,7 @@ def stage_lint_test():
         timeout=60,
     )
     out, err, pytest_rc = run_cmd(
-        "source venv/bin/activate && python3 -m pytest vector/tests/ -q --tb=line 2>&1 | tail -5",
+        "/home/ec2-user/hermes-vector-venv/bin/python -m pytest vector/tests/ -q --tb=line 2>&1 | tail -5",
         timeout=60,
     )
     print(f"  Contract tests: {out}")
