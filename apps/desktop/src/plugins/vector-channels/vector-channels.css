@@ -508,6 +508,48 @@
   margin-top: 0;
 }
 
+/* PR-015: Sidebar button icons + UX clarity */
+
+.vector-sidebar-btn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--ui-text-secondary);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.vector-sidebar-btn:hover {
+  background: var(--chrome-action-hover, rgba(128, 128, 128, 0.15));
+  color: var(--ui-text-primary, inherit);
+}
+
+.vector-channel-badge {
+  font-size: 0.625rem;
+  color: var(--ui-text-secondary, #888);
+  background: rgba(128, 128, 128, 0.12);
+  padding: 0 0.35rem;
+  border-radius: 8px;
+  line-height: 1.2rem;
+  font-weight: 500;
+  tabular-nums: true;
+}
+
+.vector-channel-row:hover {
+  background: var(--chrome-action-hover, rgba(128, 128, 128, 0.08));
+}
+
+.vector-sidebar-keyboard-hint {
+  font-size: 0.6875rem;
+  color: var(--ui-text-tertiary, #999);
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid var(--ui-border, rgba(128, 128, 128, 0.15));
+  margin-top: 0.5rem;
+}
+
 /* PR-019: Message timestamps + author avatars */
 
 .vector-message-row {
@@ -561,4 +603,165 @@
   line-height: 1.4;
   color: rgba(255, 255, 255, 0.8);
   word-wrap: break-word;
+}
+
+/* PR-014: Agent list in sidebar */
+
+.vector-agents-section {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--ui-border);
+}
+
+.vector-agents-header {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ui-text-tertiary);
+  padding: 0 0.5rem 0.5rem;
+}
+
+.vector-agent-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.375rem 0.5rem;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.vector-agent-row:hover {
+  background: var(--chrome-action-hover);
+}
+
+.vector-agent-row-active {
+  background: var(--ui-bg-active);
+}
+
+.vector-agent-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: inherit;
+  color: inherit;
+}
+
+.vector-agent-handle {
+  font-weight: 600;
+  font-size: 0.8125rem;
+}
+
+.vector-agent-model {
+  font-size: 0.6875rem;
+  color: var(--ui-text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vector-agent-row-delete {
+  opacity: 0;
+  transition: opacity 0.15s;
+  padding: 0.125rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--ui-text-tertiary);
+}
+
+.vector-agent-row:hover .vector-agent-row-delete {
+  opacity: 1;
+}
+
+.vector-agent-row-delete:hover {
+  color: var(--ui-error);
+}
+
+/* PR-014: Agent details panel */
+
+.vector-agent-details {
+  padding: 1.5rem;
+  max-width: 600px;
+}
+
+.vector-agent-details-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.vector-agent-details-title {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--ui-text-primary);
+}
+
+.vector-agent-details-grid {
+  display: grid;
+  grid-template-columns: minmax(120px, max-content) 1fr;
+  gap: 0.75rem 1rem;
+  margin: 0;
+}
+
+.vector-agent-details-grid dt {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ui-text-tertiary);
+  align-self: start;
+}
+
+.vector-agent-details-grid dd {
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.vector-agent-details-prompt {
+  white-space: pre-wrap;
+  color: var(--ui-text-primary);
+}
+
+.vector-agent-details-value {
+  font-size: 0.875rem;
+  white-space: pre-wrap;
+}
+
+.vector-agent-details-muted {
+  font-size: 0.75rem;
+  color: var(--ui-text-tertiary);
+  font-style: italic;
+}
+
+.vector-agent-memberships {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.vector-agent-membership-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.75rem;
+  background: var(--ui-bg-active);
+  font-size: 0.75rem;
 }
