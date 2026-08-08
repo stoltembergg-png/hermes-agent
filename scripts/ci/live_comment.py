@@ -83,7 +83,7 @@ def classify_jobs(api_jobs: list[dict]) -> tuple[dict[str, str], list[str], dict
     - ``pending``: list of job names still running (in_progress / queued
       / waiting). Excludes infra jobs.
     - ``job_urls``: ``{job_name: html_url}`` — direct links to each
-      job's logs page, for the assembler to use in ❌ Error links.
+      job's logs page, for the assembler to use in error links.
 
     The API returns orchestrator-level jobs and sub-workflow jobs
     (workflow_call) in separate runs — :func:`collect_run_jobs` merges
