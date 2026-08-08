@@ -14,7 +14,7 @@ import {
   listChannels,
   parseApiError,
   postMessage,
-  type RestFn,
+  type RestFn
 } from './api'
 
 // ---------------------------------------------------------------------------
@@ -26,6 +26,7 @@ function makeMockRest(): RestFn {
     if (path.endsWith('/health')) {
       return Promise.resolve({ status: 'ok', version: '0.1.0', storage: 'sqlite' } as T)
     }
+
     if (path === '/agents') {
       if (opts?.method === 'POST') {
         return Promise.resolve({
@@ -33,26 +34,29 @@ function makeMockRest(): RestFn {
           description: null,
           model: null,
           provider: null,
-          tools: [],
+          tools: []
         } as T)
       }
+
       return Promise.resolve({
-        agents: [
-          { handle: 'gandalf', description: null, model: null, provider: null, tools: [] },
-        ],
+        agents: [{ handle: 'gandalf', description: null, model: null, provider: null, tools: [] }]
       } as T)
     }
+
     if (path === '/channels') {
       if (opts?.method === 'POST') {
         return Promise.resolve({ id: 'ch1', name: 'dev' } as T)
       }
+
       return Promise.resolve({
-        channels: [{ id: 'ch1', name: 'dev', member_count: 2 }],
+        channels: [{ id: 'ch1', name: 'dev', member_count: 2 }]
       } as T)
     }
+
     if (path.includes('/members')) {
       return Promise.resolve({ members: ['human', 'gandalf'] } as T)
     }
+
     if (path.includes('/messages') && opts?.method !== 'POST') {
       return Promise.resolve({
         messages: [
@@ -62,11 +66,12 @@ function makeMockRest(): RestFn {
             author_handle: 'human',
             body: '@gandalf hello',
             mentions: ['gandalf'],
-            created_at: '2026-01-01T00:00:00Z',
-          },
-        ],
+            created_at: '2026-01-01T00:00:00Z'
+          }
+        ]
       } as T)
     }
+
     if (path.includes('/messages') && opts?.method === 'POST') {
       return Promise.resolve({
         message: {
@@ -75,14 +80,12 @@ function makeMockRest(): RestFn {
           author_handle: 'human',
           body: '@gandalf hello',
           mentions: ['gandalf'],
-          created_at: '2026-01-01T00:00:00Z',
+          created_at: '2026-01-01T00:00:00Z'
         },
         dispatch: {
-          entries: [
-            { handle: 'gandalf', depth: 0, status: 'ok', response: 'The architecture is sound.' },
-          ],
+          entries: [{ handle: 'gandalf', depth: 0, status: 'ok', response: 'The architecture is sound.' }],
           recursion_exceeded: false,
-          error: null,
+          error: null
         },
         messages: [
           {
@@ -91,7 +94,7 @@ function makeMockRest(): RestFn {
             author_handle: 'human',
             body: '@gandalf hello',
             mentions: ['gandalf'],
-            created_at: '2026-01-01T00:00:00Z',
+            created_at: '2026-01-01T00:00:00Z'
           },
           {
             id: 'm2',
@@ -99,11 +102,12 @@ function makeMockRest(): RestFn {
             author_handle: 'gandalf',
             body: 'The architecture is sound.',
             mentions: [],
-            created_at: '2026-01-01T00:01:00Z',
-          },
-        ],
+            created_at: '2026-01-01T00:01:00Z'
+          }
+        ]
       } as T)
     }
+
     return Promise.resolve({} as T)
   }) as RestFn
 }
@@ -169,7 +173,9 @@ describe('Vector API client', () => {
 
 describe('parseApiError', () => {
   it('extracts message from Vector error envelope', () => {
-    const e = new Error('400: {"error":{"code":"VECTOR_BAD_REQUEST","message":"Agent \'gandalf\' already exists","retryable":false}}')
+    const e = new Error(
+      '400: {"error":{"code":"VECTOR_BAD_REQUEST","message":"Agent \'gandalf\' already exists","retryable":false}}'
+    )
     const msg = parseApiError(e)
     expect(msg).toContain("Agent 'gandalf' already exists")
     expect(msg).toContain('cannot be retried')

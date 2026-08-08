@@ -13,7 +13,7 @@ import {
   incrementUnread,
   markRead,
   type MessageInfo,
-  totalUnread,
+  totalUnread
 } from './plugin'
 
 describe('computeAutocomplete', () => {
@@ -126,8 +126,9 @@ describe('TypeShape', () => {
       author_handle: 'gandalf',
       body: 'hello',
       created_at: '2026-01-01T00:00:00Z',
-      mentions: ['sre'],
+      mentions: ['sre']
     }
+
     expect(msg.mentions).toEqual(['sre'])
   })
 })

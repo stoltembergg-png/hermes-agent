@@ -24,7 +24,7 @@ import {
   SIDEBAR_NAV_AREA,
   type SidebarNavContribution,
   STATUSBAR_AREAS,
-  useValue,
+  useValue
 } from '@hermes/plugin-sdk'
 import { type ChangeEvent, type KeyboardEvent, useEffect, useRef, useState } from 'react'
 
@@ -45,7 +45,7 @@ import {
   type ModelOptionProvider,
   parseApiError,
   postMessage,
-  type RestFn,
+  type RestFn
 } from './api'
 
 // ---------------------------------------------------------------------------
@@ -118,9 +118,7 @@ function ChannelRow({ channel }: { channel: ChannelInfo }) {
     <button
       className={cn(
         'flex w-full items-center justify-between rounded-md px-3 py-1.5 text-sm transition-colors',
-        isActive
-          ? 'bg-(--ui-bg-active) text-foreground'
-          : 'text-(--ui-text-secondary) hover:bg-(--chrome-action-hover)',
+        isActive ? 'bg-(--ui-bg-active) text-foreground' : 'text-(--ui-text-secondary) hover:bg-(--chrome-action-hover)'
       )}
       data-testid={`vector-channel-${channel.name}`}
       onClick={() => {
@@ -141,9 +139,7 @@ function ChannelRow({ channel }: { channel: ChannelInfo }) {
         )}
       </span>
       {count > 0 && (
-        <span className="rounded-full bg-(--ui-accent) px-1.5 text-[0.625rem] tabular-nums text-white">
-          {count}
-        </span>
+        <span className="rounded-full bg-(--ui-accent) px-1.5 text-[0.625rem] tabular-nums text-white">{count}</span>
       )}
     </button>
   )
@@ -234,9 +230,7 @@ function CreateChannelModal() {
   const [err, setErr] = useState<string | null>(null)
 
   const toggleAgent = (handle: string) => {
-    setSelectedAgents(prev =>
-      prev.includes(handle) ? prev.filter(a => a !== handle) : [...prev, handle],
-    )
+    setSelectedAgents(prev => (prev.includes(handle) ? prev.filter(a => a !== handle) : [...prev, handle]))
   }
 
   const handleCreate = async () => {
@@ -289,10 +283,7 @@ function CreateChannelModal() {
               <div className="vector-agent-picker">
                 {agents.map(a => (
                   <button
-                    className={cn(
-                      'vector-agent-chip',
-                      selectedAgents.includes(a) && 'vector-agent-chip-selected',
-                    )}
+                    className={cn('vector-agent-chip', selectedAgents.includes(a) && 'vector-agent-chip-selected')}
                     key={a}
                     onClick={() => toggleAgent(a)}
                     type="button"
@@ -305,8 +296,8 @@ function CreateChannelModal() {
           )}
           {agents.length === 0 && (
             <p className="vector-modal-hint">
-              No agents registered yet. Use the "Add Agent" button to create one first,
-              or just create the channel with only yourself as a member.
+              No agents registered yet. Use the "Add Agent" button to create one first, or just create the channel with
+              only yourself as a member.
             </p>
           )}
           {err && <p className="vector-modal-error">{err}</p>}
@@ -383,7 +374,7 @@ function AddAgentModal() {
       // (createAgent already types them as optional).
       const req: Parameters<typeof createAgent>[0] = {
         handle: handle.trim(),
-        system_prompt: prompt.trim(),
+        system_prompt: prompt.trim()
       }
 
       if (provider) {
@@ -459,7 +450,9 @@ function AddAgentModal() {
               >
                 <option value="">Inherit from session</option>
                 {providers.map(p => (
-                  <option key={p.slug} value={p.slug}>{p.name}</option>
+                  <option key={p.slug} value={p.slug}>
+                    {p.name}
+                  </option>
                 ))}
               </select>
             </label>
@@ -474,7 +467,9 @@ function AddAgentModal() {
               >
                 <option value="">Inherit</option>
                 {modelOptions.map(m => (
-                  <option key={m} value={m}>{m}</option>
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
                 ))}
               </select>
             </label>
@@ -516,12 +511,7 @@ function SidebarHeader() {
         >
           <Codicon name="sync" size="0.875rem" />
         </button>
-        <button
-          className="vector-sidebar-btn"
-          onClick={() => $showAddAgent.set(true)}
-          title="Add agent"
-          type="button"
-        >
+        <button className="vector-sidebar-btn" onClick={() => $showAddAgent.set(true)} title="Add agent" type="button">
           <Codicon name="new-file" size="0.875rem" />
         </button>
         <button
@@ -560,10 +550,7 @@ async function loadChannelData(channelId: string): Promise<void> {
   $loading.set(true)
 
   try {
-    const [history, members] = await Promise.all([
-      getHistory(channelId, 50),
-      getMembers(channelId),
-    ])
+    const [history, members] = await Promise.all([getHistory(channelId, 50), getMembers(channelId)])
 
     $messages.set(history)
     $members.set(members)
@@ -629,8 +616,7 @@ function ChannelHeader() {
         <span className="vector-member-count">{members.length} members</span>
         {members.map(m => (
           <span className="vector-member-chip" key={m}>
-            <Codicon name={m === 'human' ? 'account' : 'robot'} size="0.625rem" />
-            @{m}
+            <Codicon name={m === 'human' ? 'account' : 'robot'} size="0.625rem" />@{m}
           </span>
         ))}
       </div>
@@ -652,10 +638,7 @@ function AgentRow({ agent }: { agent: AgentInfo }) {
 
   return (
     <div
-      className={cn(
-        'vector-agent-row',
-        isActive && 'vector-agent-row-active',
-      )}
+      className={cn('vector-agent-row', isActive && 'vector-agent-row-active')}
       data-testid={`vector-agent-${agent.handle}`}
     >
       <button
@@ -743,8 +726,7 @@ function AgentDetails({ agent }: { agent: AgentInfo }) {
     <div className="vector-agent-details" data-testid={`vector-agent-details-${agent.handle}`}>
       <div className="vector-agent-details-header">
         <h3 className="vector-agent-details-title">
-          <Codicon name="robot" size="1rem" />
-          @{agent.handle}
+          <Codicon name="robot" size="1rem" />@{agent.handle}
         </h3>
         <button
           className="vector-btn-primary"
@@ -828,7 +810,9 @@ function ChannelsPage() {
         $agentDetails.set(agentList)
         $agents.set(agentList.map(a => a.handle))
       } catch {
-        $error.set('Vector API not reachable. Make sure the Hermes backend is running (hermes serve or hermes dashboard).')
+        $error.set(
+          'Vector API not reachable. Make sure the Hermes backend is running (hermes serve or hermes dashboard).'
+        )
       } finally {
         $loading.set(false)
       }
@@ -871,10 +855,18 @@ function ChannelsPage() {
             <div className="vector-error-help">
               <h4>Quick start</h4>
               <ol>
-                <li>In a terminal, run: <code>hermes serve</code></li>
-                <li>Click the <Codicon name="add" size="0.75rem" /> button in the sidebar to register an agent</li>
-                <li>Click the <Codicon name="new-file" size="0.75rem" /> button to create a channel</li>
-                <li>Select the channel and start chatting — use <code>@handle</code> to mention agents</li>
+                <li>
+                  In a terminal, run: <code>hermes serve</code>
+                </li>
+                <li>
+                  Click the <Codicon name="add" size="0.75rem" /> button in the sidebar to register an agent
+                </li>
+                <li>
+                  Click the <Codicon name="new-file" size="0.75rem" /> button to create a channel
+                </li>
+                <li>
+                  Select the channel and start chatting — use <code>@handle</code> to mention agents
+                </li>
               </ol>
             </div>
           </div>
@@ -907,24 +899,20 @@ function ChannelsPage() {
                 <h4>Getting started</h4>
                 <ol>
                   <li>
-                    <Codicon name="robot" size="0.875rem" />
-                    {' '}Register an agent — click the <Codicon name="add" size="0.75rem" /> "Add Agent" button in the sidebar
+                    <Codicon name="robot" size="0.875rem" /> Register an agent — click the{' '}
+                    <Codicon name="add" size="0.75rem" /> "Add Agent" button in the sidebar
                   </li>
                   <li>
-                    <Codicon name="comment-discussion" size="0.875rem" />
-                    {' '}Create a channel — click the <Codicon name="new-file" size="0.75rem" /> "Create Channel" button
+                    <Codicon name="comment-discussion" size="0.875rem" /> Create a channel — click the{' '}
+                    <Codicon name="new-file" size="0.75rem" /> "Create Channel" button
                   </li>
                   <li>
-                    <Codicon name="mention" size="0.875rem" />
-                    {' '}Select the channel and type <code>@handle</code> to mention an agent
+                    <Codicon name="mention" size="0.875rem" /> Select the channel and type <code>@handle</code> to
+                    mention an agent
                   </li>
                 </ol>
                 <div className="vector-quick-actions">
-                  <button
-                    className="vector-btn-primary"
-                    onClick={() => $showAddAgent.set(true)}
-                    type="button"
-                  >
+                  <button className="vector-btn-primary" onClick={() => $showAddAgent.set(true)} type="button">
                     <Codicon name="add" size="0.75rem" /> Add Agent
                   </button>
                   <button
@@ -971,7 +959,7 @@ function UnreadBadge() {
     <button
       className={cn(
         'inline-flex h-full items-center gap-1 rounded-none px-1.5 text-[0.6875rem] tabular-nums transition-colors',
-        'text-(--ui-text-tertiary) hover:bg-(--chrome-action-hover) hover:text-foreground',
+        'text-(--ui-text-tertiary) hover:bg-(--chrome-action-hover) hover:text-foreground'
       )}
       onClick={() => host.navigate('/vector')}
       type="button"
@@ -998,36 +986,36 @@ const plugin: HermesPlugin = {
         data: { path: '/vector' } satisfies RouteContribution,
         id: 'page',
         area: ROUTES_AREA,
-        render: () => <ChannelsPage />,
+        render: () => <ChannelsPage />
       },
       {
         data: {
           codicon: 'comment-discussion',
           label: 'Channels',
-          path: '/vector',
+          path: '/vector'
         } satisfies SidebarNavContribution,
         id: 'nav',
         area: SIDEBAR_NAV_AREA,
-        order: 60,
+        order: 60
       },
       {
         id: 'unread',
         area: STATUSBAR_AREAS.right,
         order: 90,
-        render: () => <UnreadBadge />,
+        render: () => <UnreadBadge />
       },
       {
         data: {
           id: 'vector.openChannels',
           keywords: ['vector', 'channels', 'agents', 'chat'],
           label: 'Vector: Open Channels',
-          run: () => host.navigate('/vector'),
+          run: () => host.navigate('/vector')
         } satisfies PaletteContribution,
         id: 'open',
-        area: PALETTE_AREA,
-      },
+        area: PALETTE_AREA
+      }
     ])
-  },
+  }
 }
 
 export default plugin
@@ -1041,5 +1029,5 @@ export {
   markRead,
   type MessageInfo,
   type RestFn,
-  totalUnread,
+  totalUnread
 }

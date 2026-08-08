@@ -235,7 +235,7 @@ export async function listChannels(): Promise<ChannelInfo[]> {
 export async function createChannel(name: string, members: string[]): Promise<ChannelInfo> {
   return _call<ChannelInfo>('/channels', {
     method: 'POST',
-    body: { name, members } as CreateChannelRequest,
+    body: { name, members } as CreateChannelRequest
   })
 }
 
@@ -259,14 +259,14 @@ export async function postMessage(
   channelId: string,
   authorHandle: string,
   body: string,
-  dispatch = true,
+  dispatch = true
 ): Promise<PostMessageResponse> {
   return _call<PostMessageResponse>(`/channels/${channelId}/messages`, {
     method: 'POST',
     body: {
       author_handle: authorHandle,
       body,
-      dispatch,
-    } as PostMessageRequest,
+      dispatch
+    } as PostMessageRequest
   })
 }
