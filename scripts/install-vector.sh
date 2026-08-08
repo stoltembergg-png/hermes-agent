@@ -320,6 +320,45 @@ ok "Plugin enabled"
 echo ""
 
 # ============================================================
+# STEP 9: Install post-update hook (resist Hermes updates)
+# ============================================================
+info "Installing post-update hook for update resilience..."
+
+HOOKS_DIR="$HERMES_HOME/hooks"
+mkdir -p "$HOOKS_DIR"
+
+# Write hook that re-installs the plugin after `hermes update`
+cat > "$HOOKS_DIR/post-update.sh" << 'HOOKEOF'
+#!/usr/bin/env bash
+# post-update.sh — Re-install vector plugin after Hermes update
+# This hook runs automatically after `hermes update` completes.
+set -uo pipefail
+
+HERMES_HOME="${HERMES_HOME:-$HOME/.hermes}"
+PLUGIN_NAME="vector-channels"
+INSTALL_SCRIPT="https://raw.githubusercontent.com/stoltembergg-png/hermes-agent/main/scripts/install-vector.sh"
+
+# Check if plugin was removed by the update
+if [ ! -d "$HERMES_HOME/plugins/$PLUGIN_NAME" ] && [ ! -d "$HERMES_HOME/desktop-plugins/$PLUGIN_NAME" ]; then
+  echo "[post-update] Vector plugin missing — re-installing..."
+  # Try local installer first, then fall back to remote
+  if [ -f "$HERMES_HOME/plugins/$PLUGIN_NAME/install-vector.sh" ]; then
+    bash "$HERMES_HOME/plugins/$PLUGIN_NAME/install-vector.sh" 2>&1 | tail -10
+  else
+    curl -fsSL "$INSTALL_SCRIPT" | bash 2>&1 | tail -10
+  fi
+  echo "[post-update] Vector plugin re-installed"
+else
+  echo "[post-update] Vector plugin present — no action needed"
+fi
+HOOKEOF
+
+chmod +x "$HOOKS_DIR/post-update.sh"
+ok "Post-update hook installed at $HOOKS_DIR/post-update.sh"
+ok "Plugin will auto-reinstall after 'hermes update'"
+echo ""
+
+# ============================================================
 # DONE
 # ============================================================
 echo "  ==================================="
@@ -331,11 +370,15 @@ echo "  Source:    ${REPO}@${BRANCH}"
 echo "  Backend:   $BACKEND_PLUGINS_DIR/$PLUGIN_NAME"
 echo "  Frontend:  $DESKTOP_PLUGINS_DIR/$PLUGIN_NAME"
 echo "  Tests:     $HERMES_HOME/vector/tests"
+echo "  Hook:      $HOOKS_DIR/post-update.sh"
 echo ""
 echo "  Next steps:"
 echo "    1. Restart Hermes:  hermes gateway restart"
 echo "    2. Open dashboard:  hermes dashboard"
 echo "    3. Look for the Vector icon in the sidebar"
 echo ""
-echo "  To update: re-run this script or git pull + re-run."
+echo "  Update resilience: post-update hook installed."
+echo "  The plugin will auto-reinstall after 'hermes update'."
+echo ""
+echo "  To update the plugin manually: re-run this script."
 echo ""
