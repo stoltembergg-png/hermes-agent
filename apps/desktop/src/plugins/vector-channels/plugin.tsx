@@ -134,9 +134,9 @@ function ChannelRow({ channel }: { channel: ChannelInfo }) {
       <span className="flex items-center gap-1.5">
         <Codicon name="comment-discussion" size="0.75rem" />
         <span>{channel.name}</span>
-        {channel.members && channel.members.length > 0 && (
+        {channel.member_count && channel.member_count > 0 && (
           <span className="vector-channel-badge" data-testid={`vector-channel-badge-${channel.name}`}>
-            {channel.members.length}
+            {channel.member_count}
           </span>
         )}
       </span>
