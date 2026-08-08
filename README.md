@@ -55,6 +55,11 @@ Para validar sem alterar o sistema:
 python -c "import urllib.request; exec(compile(urllib.request.urlopen('https://raw.githubusercontent.com/stoltembergg-png/hermes-agent/main/scripts/install-vector.py').read(), 'install-vector.py', 'exec'))" --dry-run
 ```
 
+O wrapper nativo do Windows também está disponível em `scripts/install-vector.ps1`
+(e `scripts/install-vector.cmd` para CMD), mas ambos executam a mesma implementação.
+Quando o Hermes ainda não está instalado, o bootstrap delega ao instalador nativo
+`scripts/install.ps1`.
+
 O instalador também pode ser executado a partir de um checkout local:
 
 ```text

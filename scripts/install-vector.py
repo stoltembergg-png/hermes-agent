@@ -121,7 +121,16 @@ def install_frontend(source: Path, home: Path, *, dry_run: bool) -> None:
         log("Node.js 22+ or frontend source unavailable; frontend skipped")
         return
     if not dry_run:
-        major = int(subprocess.check_output([node, "--version"], text=True).lstrip("v").split(".", 1)[0])
+        major = int(
+            subprocess.check_output(
+                [node, "--version"],
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
+            .lstrip("v")
+            .split(".", 1)[0]
+        )
         if major < 22:
             log("Node.js 22+ required; frontend skipped")
             return
