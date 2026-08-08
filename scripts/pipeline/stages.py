@@ -21,9 +21,11 @@ import time
 from pathlib import Path
 
 from orchestrator import build_manifest, merge_gate, update_gates, update_role, write_manifest
+from runtime import PipelineAlreadyRunning, atomic_write_json, pipeline_lease
 
 REPO = os.environ.get("VECTOR_REPO", str(Path(__file__).resolve().parents[2]))
 STATE_FILE = Path(os.environ.get("VECTOR_PIPELINE_STATE", "/home/ec2-user/.hermes/pipeline/state.json"))
+LOCK_FILE = Path(os.environ.get("VECTOR_PIPELINE_LOCK", "/home/ec2-user/.hermes/pipeline/run.lock"))
 MANIFEST_DIR = Path(os.environ.get("VECTOR_PIPELINE_MANIFESTS", "/home/ec2-user/.hermes/pipeline/manifests"))
 STAGES = [
     "diagnose",
@@ -54,7 +56,7 @@ def save_state(state):
     })
     if len(state["history"]) > 50:
         state["history"] = state["history"][-50:]
-    STATE_FILE.write_text(json.dumps(state, indent=2), encoding="utf-8")
+    atomic_write_json(STATE_FILE, state)
 
 
 def next_stage(state):
@@ -476,7 +478,7 @@ def stage_learn():
 # ============================================================
 # MAIN
 # ============================================================
-def main():
+def run_once():
     state = load_state()
     stage_idx = next_stage(state)
     stage_name = STAGES[stage_idx]
@@ -524,6 +526,14 @@ def main():
     # Print result as JSON for the agent to consume
     print("RESULT:")
     print(json.dumps(result, indent=2, default=str))
+
+
+def main():
+    try:
+        with pipeline_lease(LOCK_FILE):
+            run_once()
+    except PipelineAlreadyRunning as exc:
+        print(json.dumps({"status": "LOCKED", "reason": str(exc)}))
 
 
 if __name__ == "__main__":
