@@ -234,6 +234,14 @@ def stage_lint_test():
     )
     print(f"  Contract tests: {out}")
     after = run_cmd("git status --porcelain")[0].strip()
+    manifest = _current_pr_manifest()
+    if manifest is not None:
+        update_gates(
+            manifest,
+            tests_green=pytest_rc == 0,
+            lint_green=eslint_rc == 0,
+            worktree_clean=not bool(after),
+        )
     return {
         "branch": branch,
         "eslint_exit": eslint_rc,
@@ -277,7 +285,7 @@ def stage_security_review():
         ["git diff secret-pattern scan"],
         "Potential credential pattern found" if found else "No credential pattern found; candidate remains subject to human review",
     )
-    update_gates(manifest, no_secrets=not found)
+    update_gates(manifest, no_secrets=not found, security_green=not found)
     return {"status": status, "merge_allowed": result["gates"]["merge_allowed"]}
 
 

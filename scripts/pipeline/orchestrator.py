@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 from dataclasses import dataclass, asdict
@@ -30,6 +31,13 @@ ROLE_ORDER = (
 )
 
 STATUS_VALUES = {"PENDING", "PASS", "FAIL", "NOT_APPLICABLE"}
+QUALITY_MINIMUM_SCORE = float(os.environ.get("VECTOR_QUALITY_BASELINE", "70"))
+PROTECTED_PATH_PREFIXES = (
+    ".github/workflows/",
+    ".github/actions/",
+    ".github/workflow/",
+)
+PROTECTED_PATHS = {"action.yml", "action.yaml", ".github/action.yml", ".github/action.yaml"}
 ROLE_LABELS = {
     "product_manager": "Product Manager",
     "architect": "Architect",
@@ -91,6 +99,62 @@ def initial_roles(paths: list[str]) -> list[RoleResult]:
     return roles
 
 
+def protected_paths(paths: list[str]) -> list[str]:
+    """Return CI/workflow paths that agents are never allowed to modify."""
+    return sorted(
+        {
+            path
+            for path in paths
+            if path in PROTECTED_PATHS or path.startswith(PROTECTED_PATH_PREFIXES)
+        }
+    )
+
+
+def quality_score(manifest: dict[str, Any]) -> int:
+    """Score observable quality without allowing subjective model claims."""
+    roles = manifest.get("roles", [])
+    role_points = sum(
+        4 if role.get("status") in {"PASS", "NOT_APPLICABLE"} else 0
+        for role in roles
+    )
+    gates = manifest.get("gates", {})
+    gate_points = sum(
+        weight
+        for key, weight in (
+            ("tests_green", 15),
+            ("lint_green", 15),
+            ("security_green", 15),
+            ("ci_green", 10),
+            ("worktree_clean", 5),
+            ("no_secrets", 5),
+        )
+        if gates.get(key) is True
+    )
+    return min(100, role_points + gate_points)
+
+
+def evaluate_quality(manifest: dict[str, Any]) -> dict[str, Any]:
+    """Return a monotonic quality decision for the current manifest."""
+    score = quality_score(manifest)
+    previous = manifest.get("quality_gate", {})
+    baseline = float(previous.get("baseline_score", QUALITY_MINIMUM_SCORE))
+    changed = manifest.get("evidence", {}).get("changed_files", [])
+    protected = protected_paths(changed)
+    regressions: list[str] = []
+    if score < baseline:
+        regressions.append(f"quality score {score} is below baseline {baseline:g}")
+    if protected:
+        regressions.append("agent change touches protected CI/workflow paths")
+    return {
+        "score": score,
+        "baseline_score": baseline,
+        "delta": round(score - baseline, 2),
+        "regressions": regressions,
+        "protected_paths": protected,
+        "promotion_allowed": not regressions and score >= QUALITY_MINIMUM_SCORE,
+    }
+
+
 def _all_checks_green(checks: list[dict[str, Any]]) -> bool:
     if not checks:
         return False
@@ -104,6 +168,7 @@ def merge_gate(manifest: dict[str, Any]) -> dict[str, Any]:
     ci_ok = bool(manifest.get("gates", {}).get("ci_green"))
     clean_ok = bool(manifest.get("gates", {}).get("worktree_clean"))
     secrets_ok = bool(manifest.get("gates", {}).get("no_secrets"))
+    quality = evaluate_quality(manifest)
     reasons = []
     if not role_ok:
         reasons.append("role evidence incomplete or failed")
@@ -113,7 +178,11 @@ def merge_gate(manifest: dict[str, Any]) -> dict[str, Any]:
         reasons.append("worktree is not clean")
     if not secrets_ok:
         reasons.append("secret scan did not pass")
-    return {"merge_allowed": not reasons, "reasons": reasons}
+    if not quality["promotion_allowed"]:
+        reasons.extend(f"quality gate: {reason}" for reason in quality["regressions"])
+        if quality["score"] < QUALITY_MINIMUM_SCORE:
+            reasons.append(f"quality score {quality['score']} is below minimum {QUALITY_MINIMUM_SCORE:g}")
+    return {"merge_allowed": not reasons, "reasons": reasons, "quality": quality}
 
 
 def build_manifest(
@@ -140,10 +209,14 @@ def build_manifest(
         "evidence": {"changed_files": paths},
         "gates": {
             "ci_green": ci_green,
+            "tests_green": False,
+            "lint_green": False,
+            "security_green": False,
             "worktree_clean": worktree_clean,
             "no_secrets": no_secrets,
         },
     }
+    manifest["quality_gate"] = evaluate_quality(manifest)
     manifest["gates"].update(merge_gate(manifest))
     return manifest
 
@@ -165,6 +238,7 @@ def update_role(manifest_path: Path, role: str, status: str, evidence: list[str]
             break
     else:
         raise KeyError(role)
+    manifest["quality_gate"] = evaluate_quality(manifest)
     manifest["gates"].update(merge_gate(manifest))
     write_manifest(manifest, manifest_path.parent)
     return manifest
@@ -173,6 +247,7 @@ def update_role(manifest_path: Path, role: str, status: str, evidence: list[str]
 def update_gates(manifest_path: Path, **gates: bool) -> dict[str, Any]:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     manifest["gates"].update({key: bool(value) for key, value in gates.items()})
+    manifest["quality_gate"] = evaluate_quality(manifest)
     manifest["gates"].update(merge_gate(manifest))
     write_manifest(manifest, manifest_path.parent)
     return manifest
